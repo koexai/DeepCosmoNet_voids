@@ -1,0 +1,372 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>src.full_grid_tensor &#8212; DeepCosmoNet Voids 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css" />
+    <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for src.full_grid_tensor</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">This module contains the main function to convert void proposals</span>
+<span class="sd">into a full 3D grid tensor, and a reusable BoxClusterer class</span>
+<span class="sd">for clustering boxes based on IoU.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">from</span> <span class="nn">scipy.spatial</span> <span class="kn">import</span> <span class="n">cKDTree</span>
+<span class="kn">from</span> <span class="nn">sklearn.cluster</span> <span class="kn">import</span> <span class="n">DBSCAN</span>
+<span class="kn">from</span> <span class="nn">src.dcn_config</span> <span class="kn">import</span> <span class="n">CUBESIZE</span><span class="p">,</span> <span class="n">ANCHOR_MULTIPLIERS</span><span class="p">,</span> <span class="n">SCALE_ADJ</span>
+
+
+<div class="viewcode-block" id="voids_to_target_full_grid"><a class="viewcode-back" href="../../src.html#src.full_grid_tensor.voids_to_target_full_grid">[docs]</a><span class="k">def</span> <span class="nf">voids_to_target_full_grid</span><span class="p">(</span><span class="n">subset</span><span class="p">,</span> <span class="n">anchor</span><span class="p">,</span> <span class="n">grid_size</span><span class="p">,</span> <span class="n">o_x</span><span class="p">,</span> <span class="n">o_y</span><span class="p">,</span> <span class="n">o_z</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Assign every grid cell to the closest void using KDTree,</span>
+<span class="sd">    and mask out cells that are outside the void radius.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        subset: pandas DataFrame with columns [&#39;x&#39;, &#39;y&#39;, &#39;z&#39;, &#39;radius&#39;]</span>
+<span class="sd">        anchor: int, anchor index (0, 1, or 2) for radius scaling</span>
+<span class="sd">        grid_size: int, size of the 3D output grid</span>
+<span class="sd">        o_x, o_y, o_z: int offsets in voxel space</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tensor: shape (5, grid_size, grid_size, grid_size)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">tensor</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">5</span><span class="p">,</span> <span class="n">grid_size</span><span class="p">,</span> <span class="n">grid_size</span><span class="p">,</span> <span class="n">grid_size</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">subset</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">tensor</span>
+
+    <span class="c1"># multipliers</span>
+    <span class="n">anchor_mult</span> <span class="o">=</span> <span class="n">ANCHOR_MULTIPLIERS</span><span class="p">[</span><span class="n">anchor</span><span class="p">]</span>
+
+    <span class="c1"># Scale world units into local voxel grid (correct base scale)</span>
+    <span class="n">scale</span> <span class="o">=</span> <span class="n">grid_size</span> <span class="o">/</span> <span class="n">CUBESIZE</span>
+
+    <span class="n">x</span> <span class="o">=</span> <span class="n">subset</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="o">*</span> <span class="n">scale</span> <span class="o">-</span> <span class="n">o_x</span> <span class="o">*</span> <span class="n">grid_size</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">subset</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="o">*</span> <span class="n">scale</span> <span class="o">-</span> <span class="n">o_y</span> <span class="o">*</span> <span class="n">grid_size</span>
+    <span class="n">z</span> <span class="o">=</span> <span class="n">subset</span><span class="p">[</span><span class="s2">&quot;z&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="o">*</span> <span class="n">scale</span> <span class="o">-</span> <span class="n">o_z</span> <span class="o">*</span> <span class="n">grid_size</span>
+    <span class="c1"># real radius in grid units (for mask and KDTree)</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">subset</span><span class="p">[</span><span class="s2">&quot;radius&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="o">*</span> <span class="n">scale</span>
+
+    <span class="n">voids_pos</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># shape (N, 3)</span>
+    <span class="n">voids_r</span> <span class="o">=</span> <span class="n">r</span>  <span class="c1"># real radius in grid units (for the mask)</span>
+
+    <span class="c1"># offset logaritmico compresso con SCALE_ADJ</span>
+    <span class="c1"># Inverso di decode: radius = (2^(r_off-0.5) / scale) * SCALE_ADJ * anchor_mult</span>
+    <span class="n">voids_r_log</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="n">r</span> <span class="o">/</span> <span class="p">(</span><span class="n">SCALE_ADJ</span> <span class="o">*</span> <span class="n">anchor_mult</span><span class="p">))</span> <span class="o">+</span> <span class="mf">0.5</span>
+
+    <span class="c1"># Build KDTree for efficient NN search</span>
+    <span class="n">tree</span> <span class="o">=</span> <span class="n">cKDTree</span><span class="p">(</span><span class="n">voids_pos</span><span class="p">)</span>
+
+    <span class="c1"># Build the full grid of voxel centers</span>
+    <span class="n">grid_coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">grid_size</span><span class="p">),</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">grid_size</span><span class="p">),</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">grid_size</span><span class="p">),</span>
+            <span class="n">indexing</span><span class="o">=</span><span class="s2">&quot;ij&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+
+    <span class="n">grid_world</span> <span class="o">=</span> <span class="p">(</span><span class="n">grid_coords</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>  <span class="c1"># (V, 3)</span>
+
+    <span class="c1"># Query the nearest void for each grid cell</span>
+    <span class="n">dists</span><span class="p">,</span> <span class="n">indices</span> <span class="o">=</span> <span class="n">tree</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">grid_world</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">matched_voids</span> <span class="o">=</span> <span class="n">voids_pos</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span>  <span class="c1"># (V, 3)</span>
+    <span class="n">matched_radius</span> <span class="o">=</span> <span class="n">voids_r</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span>  <span class="c1"># (V,)</span>
+    <span class="n">matched_radius_log</span> <span class="o">=</span> <span class="n">voids_r_log</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span>  <span class="c1"># (V,)</span>
+
+    <span class="c1"># Mask: keep cells within void radius</span>
+    <span class="n">mask</span> <span class="o">=</span> <span class="n">dists</span> <span class="o">&lt;=</span> <span class="n">matched_radius</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>  <span class="c1"># (V,)</span>
+
+    <span class="c1"># Compute sub-voxel offsets, compressi con SCALE_ADJ</span>
+    <span class="c1"># Inverso di decode: x = (x_ids + x_off * SCALE_ADJ + 0.5 + o_x * G) / scale</span>
+    <span class="n">offsets</span> <span class="o">=</span> <span class="p">(</span><span class="n">matched_voids</span> <span class="o">-</span> <span class="n">grid_world</span><span class="p">)</span> <span class="o">/</span> <span class="n">SCALE_ADJ</span>  <span class="c1"># (V, 3)</span>
+
+    <span class="c1"># Prepare tensor shape</span>
+    <span class="n">x_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">grid_size</span><span class="p">,</span> <span class="n">grid_size</span><span class="p">,</span> <span class="n">grid_size</span><span class="p">)</span>
+
+    <span class="c1"># Fill tensor only where mask is valid</span>
+    <span class="n">tensor</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>  <span class="c1"># confidence</span>
+    <span class="n">tensor</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">offsets</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">x_shape</span><span class="p">)</span>
+    <span class="n">tensor</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">offsets</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">x_shape</span><span class="p">)</span>
+    <span class="n">tensor</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">offsets</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">x_shape</span><span class="p">)</span>
+    <span class="n">tensor</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="n">matched_radius_log</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">x_shape</span><span class="p">)</span>
+
+    <span class="n">tensor</span> <span class="o">*=</span> <span class="n">mask</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">x_shape</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">tensor</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="BoxClusterer"><a class="viewcode-back" href="../../src.html#src.full_grid_tensor.BoxClusterer">[docs]</a><span class="k">class</span> <span class="nc">BoxClusterer</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Reusable clusterer for grouping boxes based on precomputed IoU matrix.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">min_cluster_size</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">cluster_selection_epsilon</span><span class="o">=</span><span class="mf">1.0</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize reusable HDBSCAN clusterer.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clusterer</span> <span class="o">=</span> <span class="n">DBSCAN</span><span class="p">(</span>
+            <span class="n">eps</span><span class="o">=</span><span class="n">cluster_selection_epsilon</span><span class="p">,</span>
+            <span class="n">min_samples</span><span class="o">=</span><span class="n">min_cluster_size</span><span class="p">,</span>
+            <span class="n">metric</span><span class="o">=</span><span class="s2">&quot;precomputed&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="BoxClusterer.cluster"><a class="viewcode-back" href="../../src.html#src.full_grid_tensor.BoxClusterer.cluster">[docs]</a>    <span class="k">def</span> <span class="nf">cluster</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">iou_mat</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Cluster boxes using precomputed IoU matrix.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            iou_mat: torch.Tensor (N,N) IoU matrix in float32</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            labels: torch.Tensor (N,) with cluster IDs</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># detach from graph + move to CPU numpy</span>
+        <span class="c1"># dist_mat = (1.0 - iou_mat.detach().cpu().float().numpy()).astype(np.float64)</span>
+        <span class="n">dist_mat</span> <span class="o">=</span> <span class="n">iou_mat</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">float</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+        <span class="c1"># fit &amp; predict</span>
+        <span class="n">labels</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">clusterer</span><span class="o">.</span><span class="n">fit_predict</span><span class="p">(</span><span class="n">dist_mat</span><span class="p">)</span>
+
+        <span class="c1"># return back as torch</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">labels</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">iou_mat</span><span class="o">.</span><span class="n">device</span><span class="p">)</span><span class="o">.</span><span class="n">long</span><span class="p">()</span></div></div>
+
+
+<div class="viewcode-block" id="group_means"><a class="viewcode-back" href="../../src.html#src.full_grid_tensor.group_means">[docs]</a><span class="k">def</span> <span class="nf">group_means</span><span class="p">(</span>
+    <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">labels</span><span class="p">,</span> <span class="n">exclude_outliers</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Groups rows in df by cluster labels and averages values for clusters (label &gt;= 0).</span>
+<span class="sd">    Outliers (label == -1) are either dropped or appended as-is depending on exclude_outliers.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    df : pd.DataFrame</span>
+<span class="sd">        Input dataframe to group.</span>
+<span class="sd">    labels : np.ndarray</span>
+<span class="sd">        Cluster labels from DBSCAN (same length as df).</span>
+<span class="sd">    exclude_outliers : bool, default True</span>
+<span class="sd">        If True, outliers (label == -1) are dropped.</span>
+<span class="sd">        If False, outliers are appended as-is to the result.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">        pd.DataFrame with aggregated cluster means (and optionally outliers).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">labels</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Length of labels must match number of rows in df&quot;</span><span class="p">)</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;_label&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">labels</span>
+
+    <span class="c1"># Compute means for clusters (label &gt;= 0)</span>
+    <span class="n">cluster_means</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;_label&quot;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">&quot;_label&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">numeric_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">cluster_means</span> <span class="o">=</span> <span class="n">cluster_means</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;_label&quot;</span><span class="p">],</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;ignore&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">exclude_outliers</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">cluster_means</span>
+
+    <span class="c1"># Append outliers as-is</span>
+    <span class="n">outliers</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;_label&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="s2">&quot;_label&quot;</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">cluster_means</span><span class="p">,</span> <span class="n">outliers</span><span class="p">],</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="group_means_with_outliers_"><a class="viewcode-back" href="../../src.html#src.full_grid_tensor.group_means_with_outliers_">[docs]</a><span class="k">def</span> <span class="nf">group_means_with_outliers_</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">labels</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Groups rows in df by cluster labels, averages values for clusters (label &gt;= 0),</span>
+<span class="sd">    and appends outliers (label == -1) as-is.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    df : pd.DataFrame</span>
+<span class="sd">        Input dataframe to group.</span>
+<span class="sd">    labels : np.ndarray</span>
+<span class="sd">        Cluster labels from HDBSCAN (same length as df).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">        pd.DataFrame with aggregated cluster means and ungrouped outliers.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">labels</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Length of labels must match number of rows in df&quot;</span><span class="p">)</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;_label&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">labels</span>
+
+    <span class="c1"># Compute means for clusters (excluding outliers)</span>
+    <span class="n">cluster_means</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;_label&quot;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">&quot;_label&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">numeric_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Extract outliers as-is</span>
+    <span class="n">outliers</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;_label&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="s2">&quot;_label&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Drop _label from cluster means to match outlier structure</span>
+    <span class="n">cluster_means</span> <span class="o">=</span> <span class="n">cluster_means</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;_label&quot;</span><span class="p">],</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;ignore&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Concatenate cluster means and outliers</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">cluster_means</span><span class="p">,</span> <span class="n">outliers</span><span class="p">],</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="group_means_without_outliers_"><a class="viewcode-back" href="../../src.html#src.full_grid_tensor.group_means_without_outliers_">[docs]</a><span class="k">def</span> <span class="nf">group_means_without_outliers_</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">labels</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Groups rows in df by cluster labels, averages values for clusters (label &gt;= 0),</span>
+<span class="sd">    and DROPS outliers (label == -1) — single detections in a cell are spurious proposals.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    df : pd.DataFrame</span>
+<span class="sd">        Input dataframe to group.</span>
+<span class="sd">    labels : np.ndarray</span>
+<span class="sd">        Cluster labels from DBSCAN (same length as df).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">        pd.DataFrame with aggregated cluster means only (no spurious proposals).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">labels</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Length of labels must match number of rows in df&quot;</span><span class="p">)</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;_label&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">labels</span>
+
+    <span class="n">n_outliers</span> <span class="o">=</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;_label&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">n_outliers</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">pass</span>  <span class="c1"># silently drop spurious single-detection proposals</span>
+
+    <span class="c1"># Compute means for clusters only (label &gt;= 0)</span>
+    <span class="n">cluster_means</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;_label&quot;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">&quot;_label&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">numeric_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">cluster_means</span> <span class="o">=</span> <span class="n">cluster_means</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;_label&quot;</span><span class="p">],</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;ignore&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">cluster_means</span></div>
+
+
+<div class="viewcode-block" id="print_tensor_summary"><a class="viewcode-back" href="../../src.html#src.full_grid_tensor.print_tensor_summary">[docs]</a><span class="k">def</span> <span class="nf">print_tensor_summary</span><span class="p">(</span><span class="n">tensor</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Nicely print the tensor content per grid cell.</span>
+<span class="sd">    Only prints active cells (confidence &gt; 0).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">conf</span> <span class="o">=</span> <span class="n">tensor</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">x_off</span><span class="p">,</span> <span class="n">y_off</span><span class="p">,</span> <span class="n">z_off</span><span class="p">,</span> <span class="n">r_log</span> <span class="o">=</span> <span class="n">tensor</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">tensor</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">tensor</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="n">tensor</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span>
+
+    <span class="n">grid_size</span> <span class="o">=</span> <span class="n">conf</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">grid_size</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">y</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">grid_size</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">z</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">grid_size</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">conf</span><span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Voxel (</span><span class="si">{</span><span class="n">x</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">y</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">z</span><span class="si">}</span><span class="s2">): conf=1, x_off=</span><span class="si">{</span><span class="n">x_off</span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">,</span><span class="w"> </span><span class="n">z</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, y_off=</span><span class="si">{</span><span class="n">y_off</span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">,</span><span class="w"> </span><span class="n">z</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, z_off=</span><span class="si">{</span><span class="n">z_off</span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">,</span><span class="w"> </span><span class="n">z</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, log_r=</span><span class="si">{</span><span class="n">r_log</span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">,</span><span class="w"> </span><span class="n">z</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">)</span></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">DeepCosmoNet Voids</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2026, Vincenzo Del Zoppo.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 5.3.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

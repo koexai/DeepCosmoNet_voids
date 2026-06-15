@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>src.dcn_config &#8212; DeepCosmoNet Voids 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css" />
+    <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+
+    <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+
+
+    <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+
+  <body>
+
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+
+
+          <div class="body" role="main">
+
+            <h1>Source code for src.dcn_config</h1>
+            <div class="highlight">
+              <pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">This module defines the paths for data and outputs using a standardized,</span>
+<span class="sd">deploy-ready project structure, and stores all global project-wide configuration constants.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Path Configuration (Standardized Deployment Structure)</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<span class="c1"># Since this file lives in project_root/src/, we get the project root directory</span>
+<span class="n">SRC_DIR</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">))</span>
+<span class="n">PROJECT_ROOT</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">SRC_DIR</span><span class="p">)</span>
+
+<span class="c1"># Standardized folder locations</span>
+<span class="n">DATA_DIR</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PROJECT_ROOT</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">)</span>
+<span class="n">OUTPUT_DIR</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PROJECT_ROOT</span><span class="p">,</span> <span class="s2">&quot;output&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="get_dataset_paths"><a class="viewcode-back" href="../../src.html#src.dcn_config.get_dataset_paths">[docs]</a><span class="k">def</span> <span class="nf">get_dataset_paths</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns the dataset paths for particles and voids for both train and val sets.</span>
+<span class="sd">    </span>
+<span class="sd">    Structure expected:</span>
+<span class="sd">        project_root/</span>
+<span class="sd">        ├── data/</span>
+<span class="sd">        │   ├── voxel_particles_train/</span>
+<span class="sd">        │   ├── voxel_particles_val/</span>
+<span class="sd">        │   ├── voxel_void_train/</span>
+<span class="sd">        │   └── voxel_void_val/</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">root_particles</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">DATA_DIR</span><span class="p">,</span> <span class="s2">&quot;voxel_particles_&quot;</span><span class="p">)</span>
+    <span class="n">root_void</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">DATA_DIR</span><span class="p">,</span> <span class="s2">&quot;voxel_void_&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">root_particles</span> <span class="o">+</span> <span class="s2">&quot;train&quot;</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span><span class="p">,</span>
+        <span class="n">root_particles</span> <span class="o">+</span> <span class="s2">&quot;val&quot;</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span><span class="p">,</span>
+        <span class="n">root_void</span> <span class="o">+</span> <span class="s2">&quot;train&quot;</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span><span class="p">,</span>
+        <span class="n">root_void</span> <span class="o">+</span> <span class="s2">&quot;val&quot;</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="get_output_paths"><a class="viewcode-back" href="../../src.html#src.dcn_config.get_output_paths">[docs]</a><span class="k">def</span> <span class="nf">get_output_paths</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns the output path for models and logs.</span>
+<span class="sd">    </span>
+<span class="sd">    Structure expected:</span>
+<span class="sd">        project_root/</span>
+<span class="sd">        └── output/</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Ensure the output directory exists</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">OUTPUT_DIR</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">OUTPUT_DIR</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">sep</span></div>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Project-wide constants</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="n">PREFIX</span> <span class="o">=</span> <span class="s2">&quot;merged_labeled_zone&quot;</span>
+<span class="n">CUBESIZE</span> <span class="o">=</span> <span class="mi">2000</span> <span class="o">/</span> <span class="mi">16</span>  <span class="c1"># Physical size of a voxel cube in Mpc/h</span>
+
+<span class="n">NUM_HEADS</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>  <span class="c1"># Detection heads (scales: 2x2x2, 4x4x4, 8x8x8)</span>
+<span class="n">NUM_ANCHORS</span> <span class="o">=</span> <span class="mi">5</span>  <span class="c1"># Anchors per head</span>
+<span class="n">SUBSETS_PER_ANCHOR</span> <span class="o">=</span> <span class="mi">3</span>  <span class="c1"># Consecutive radius subsets merged per anchor</span>
+
+<span class="n">ANCHOR_MULTIPLIERS</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="mi">2</span> <span class="o">**</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">-</span><span class="n">NUM_ANCHORS</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">NUM_ANCHORS</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="n">NUM_ANCHORS</span><span class="p">)[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<span class="p">)</span>
+<span class="n">N_BINS</span> <span class="o">=</span> <span class="n">NUM_ANCHORS</span> <span class="o">*</span> <span class="n">NUM_HEADS</span>
+<span class="n">SCALE_ADJ</span> <span class="o">=</span> <span class="mi">2</span>
+
+</pre>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+          <h1 class="logo"><a href="../../index.html">DeepCosmoNet Voids</a></h1>
+
+
+
+
+
+
+
+
+          <h3>Navigation</h3>
+
+          <div class="relations">
+            <h3>Related Topics</h3>
+            <ul>
+              <li><a href="../../index.html">Documentation overview</a>
+                <ul>
+                  <li><a href="../index.html">Module code</a>
+                    <ul>
+                    </ul>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+          <div id="searchbox" style="display: none" role="search">
+            <h3 id="searchlabel">Quick search</h3>
+            <div class="searchformwrapper">
+              <form class="search" action="../../search.html" method="get">
+                <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off"
+                  autocapitalize="off" spellcheck="false" />
+                <input type="submit" value="Go" />
+              </form>
+            </div>
+          </div>
+          <script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2026, Vincenzo Del Zoppo.
+
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 5.3.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+
+    </div>
+
+
+
+
+  </body>
+
+</html>

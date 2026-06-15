@@ -1,0 +1,562 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>src.model &#8212; DeepCosmoNet Voids 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css" />
+    <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for src.model</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Cosmic Void Detection Network - Modular YOLO v1 3D with Multi-Scale Heads</span>
+<span class="sd">This implementation defines a flexible 3D detection network inspired by YOLO v1,</span>
+<span class="sd">adapted for cosmic void detection in 3D cosmological data.</span>
+<span class="sd">The architecture includes a backbone with configurable depth,</span>
+<span class="sd">a feature pyramid with fusion, and multiple detection heads.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">nn</span>
+<span class="kn">from</span> <span class="nn">src.dcn_config</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ANCHOR_MULTIPLIERS</span> <span class="k">as</span> <span class="n">_ANCHOR_MULTIPLIERS</span><span class="p">,</span>
+    <span class="n">NUM_ANCHORS</span> <span class="k">as</span> <span class="n">_NUM_ANCHORS</span><span class="p">,</span>
+    <span class="n">NUM_HEADS</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="Config3D"><a class="viewcode-back" href="../../src.html#src.model.Config3D">[docs]</a><span class="k">class</span> <span class="nc">Config3D</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Configuration class for the 3D YOLO-based cosmic void detection network.&quot;&quot;&quot;</span>
+    <span class="c1"># Scale grids for num heads</span>
+    <span class="n">SCALES</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">16</span><span class="p">][:</span> <span class="n">NUM_HEADS</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+
+    <span class="c1"># Anchor multipliers for radius prediction (log-scale), from config_env</span>
+    <span class="n">ANCHOR_MULTIPLIERS</span> <span class="o">=</span> <span class="n">_ANCHOR_MULTIPLIERS</span>
+    <span class="n">NUM_ANCHORS</span> <span class="o">=</span> <span class="n">_NUM_ANCHORS</span>
+
+    <span class="n">CHANNELS_PER_ANCHOR</span> <span class="o">=</span> <span class="mi">5</span>
+    <span class="n">TARGET_CHANNELS</span> <span class="o">=</span> <span class="n">CHANNELS_PER_ANCHOR</span> <span class="o">*</span> <span class="n">NUM_ANCHORS</span>
+
+    <span class="n">INPUT_SIZE</span> <span class="o">=</span> <span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="mi">128</span><span class="p">)</span>
+    <span class="n">INPUT_CHANNELS</span> <span class="o">=</span> <span class="mi">5</span></div>
+
+
+<span class="n">config3d</span> <span class="o">=</span> <span class="n">Config3D</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="ConvBlock3D"><a class="viewcode-back" href="../../src.html#src.model.ConvBlock3D">[docs]</a><span class="k">class</span> <span class="nc">ConvBlock3D</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Reusable 3D convolutional block.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">    - in_channels: int, number of input channels</span>
+<span class="sd">    - out_channels: int, number of output channels</span>
+<span class="sd">    - kernel_size: int, convolution kernel size (default: 2)</span>
+<span class="sd">    - stride: int, convolution stride (default: 2)</span>
+<span class="sd">    - padding: int, convolution padding (default: 0)</span>
+<span class="sd">    - dropout_rate: float, dropout probability (default: 0.0)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    - tensor: processed feature tensor</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">in_channels</span><span class="p">,</span>
+        <span class="n">out_channels</span><span class="p">,</span>
+        <span class="n">kernel_size</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="n">stride</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="n">padding</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">dropout_rate</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;ConvBlock3D: 3D convolution</span>
+<span class="sd">        followed by BN, activation, and dropout.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv3d</span><span class="p">(</span><span class="n">in_channels</span><span class="p">,</span> <span class="n">out_channels</span><span class="p">,</span> <span class="n">kernel_size</span><span class="p">,</span> <span class="n">stride</span><span class="p">,</span> <span class="n">padding</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bn</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm3d</span><span class="p">(</span><span class="n">out_channels</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">activation</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">LeakyReLU</span><span class="p">(</span><span class="n">negative_slope</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dropout</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Dropout3d</span><span class="p">(</span><span class="n">p</span><span class="o">=</span><span class="n">dropout_rate</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ConvBlock3D.forward"><a class="viewcode-back" href="../../src.html#src.model.ConvBlock3D.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Forward pass for the convolutional block.&quot;&quot;&quot;</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bn</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">activation</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dropout</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">x</span></div></div>
+
+
+<div class="viewcode-block" id="UpsampleBlock3D"><a class="viewcode-back" href="../../src.html#src.model.UpsampleBlock3D">[docs]</a><span class="k">class</span> <span class="nc">UpsampleBlock3D</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Reusable 3D upsampling block.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">    - in_channels: int, number of input channels</span>
+<span class="sd">    - out_channels: int, number of output channels</span>
+<span class="sd">    - dropout_rate: float, dropout probability (default: 0.0)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    - tensor: upsampled feature tensor</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">in_channels</span><span class="p">,</span> <span class="n">out_channels</span><span class="p">,</span> <span class="n">dropout_rate</span><span class="o">=</span><span class="mf">0.0</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;UpsampleBlock3D: 3D transposed convolution for upsampling,</span>
+<span class="sd">        followed by BN, activation, and dropout.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">upsample</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ConvTranspose3d</span><span class="p">(</span>
+            <span class="n">in_channels</span><span class="p">,</span> <span class="n">out_channels</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">stride</span><span class="o">=</span><span class="mi">2</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bn</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm3d</span><span class="p">(</span><span class="n">out_channels</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">activation</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">LeakyReLU</span><span class="p">(</span><span class="n">negative_slope</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dropout</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Dropout3d</span><span class="p">(</span><span class="n">p</span><span class="o">=</span><span class="n">dropout_rate</span><span class="p">)</span>
+
+<div class="viewcode-block" id="UpsampleBlock3D.forward"><a class="viewcode-back" href="../../src.html#src.model.UpsampleBlock3D.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Forward pass for the upsampling block.&quot;&quot;&quot;</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">upsample</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bn</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">activation</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dropout</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">x</span></div></div>
+
+
+<div class="viewcode-block" id="FusionBlock3D"><a class="viewcode-back" href="../../src.html#src.model.FusionBlock3D">[docs]</a><span class="k">class</span> <span class="nc">FusionBlock3D</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Reusable feature fusion block.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">    - in_channels: int, number of input channels</span>
+<span class="sd">    - out_channels: int, number of output channels</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    - tensor: fused feature tensor</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">in_channels</span><span class="p">,</span> <span class="n">out_channels</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;FusionBlock3D: 1x1x1 convolution</span>
+<span class="sd">        to fuse features from different levels,&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv3d</span><span class="p">(</span><span class="n">in_channels</span><span class="p">,</span> <span class="n">out_channels</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">activation</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">LeakyReLU</span><span class="p">(</span><span class="n">negative_slope</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+
+<div class="viewcode-block" id="FusionBlock3D.forward"><a class="viewcode-back" href="../../src.html#src.model.FusionBlock3D.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Forward pass for the fusion block.&quot;&quot;&quot;</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">activation</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">x</span></div></div>
+
+
+<div class="viewcode-block" id="SuperSeparableBlock"><a class="viewcode-back" href="../../src.html#src.model.SuperSeparableBlock">[docs]</a><span class="k">class</span> <span class="nc">SuperSeparableBlock</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A residual hidden block: Conv3d -&gt; BN -&gt; LeakyReLU -&gt; Dropout, with skip connection.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channels</span><span class="p">,</span> <span class="n">dropout_rate</span><span class="o">=</span><span class="mf">0.0</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;SuperSeparableBlock: a residual block with depthwise convolutions</span>
+<span class="sd">        to reduce parameters while maintaining expressiveness.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">block</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">Conv3d</span><span class="p">(</span>
+                <span class="n">channels</span><span class="p">,</span>
+                <span class="n">channels</span><span class="p">,</span>
+                <span class="n">kernel_size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+                <span class="n">stride</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">padding</span><span class="o">=</span><span class="s2">&quot;same&quot;</span><span class="p">,</span>
+                <span class="n">groups</span><span class="o">=</span><span class="n">channels</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">Conv3d</span><span class="p">(</span>
+                <span class="n">channels</span><span class="p">,</span>
+                <span class="n">channels</span><span class="p">,</span>
+                <span class="n">kernel_size</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+                <span class="n">stride</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">padding</span><span class="o">=</span><span class="s2">&quot;same&quot;</span><span class="p">,</span>
+                <span class="n">groups</span><span class="o">=</span><span class="n">channels</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">Conv3d</span><span class="p">(</span>
+                <span class="n">channels</span><span class="p">,</span>
+                <span class="n">channels</span><span class="p">,</span>
+                <span class="n">kernel_size</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
+                <span class="n">stride</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">padding</span><span class="o">=</span><span class="s2">&quot;same&quot;</span><span class="p">,</span>
+                <span class="n">groups</span><span class="o">=</span><span class="n">channels</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">Conv3d</span><span class="p">(</span>
+                <span class="n">channels</span><span class="p">,</span> <span class="n">channels</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">stride</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="s2">&quot;same&quot;</span>
+            <span class="p">),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm3d</span><span class="p">(</span><span class="n">channels</span><span class="p">),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">LeakyReLU</span><span class="p">(</span><span class="n">negative_slope</span><span class="o">=</span><span class="mf">0.1</span><span class="p">),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">Dropout3d</span><span class="p">(</span><span class="n">p</span><span class="o">=</span><span class="n">dropout_rate</span><span class="p">),</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="SuperSeparableBlock.forward"><a class="viewcode-back" href="../../src.html#src.model.SuperSeparableBlock.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Forward pass for the SuperSeparableBlock with a skip connection.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">x</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">block</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>  <span class="c1"># skip connection</span></div></div>
+
+
+<div class="viewcode-block" id="Detection3DHead"><a class="viewcode-back" href="../../src.html#src.model.Detection3DHead">[docs]</a><span class="k">class</span> <span class="nc">Detection3DHead</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Flexible 3D detection head with multiple anchors.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">    - in_channels: int, number of input channels</span>
+<span class="sd">    - grid_size: int, size of the output grid</span>
+<span class="sd">    - dropout_rate: float, dropout probability (default: 0.0)</span>
+<span class="sd">    - num_hidden_blocks: int, number of hidden conv blocks to insert (default: 1)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    - tensor: shape (5*NUM_ANCHORS, grid_size, grid_size, grid_size)</span>
+<span class="sd">    For each anchor:</span>
+<span class="sd">    [anchor*5 + 0] = objectness (void presence probability)</span>
+<span class="sd">    [anchor*5 + 1] = x_offset</span>
+<span class="sd">    [anchor*5 + 2] = y_offset</span>
+<span class="sd">    [anchor*5 + 3] = z_offset</span>
+<span class="sd">    [anchor*5 + 4] = radius_offset (log-scaled, relative to anchor multiplier)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">in_channels</span><span class="p">,</span>
+        <span class="n">grid_size</span><span class="p">,</span>
+        <span class="n">dropout_rate</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">num_hidden_blocks</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">initial_obj_prior</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initializes the Detection3DHead with a learnable objectness prior.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">grid_size</span> <span class="o">=</span> <span class="n">grid_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_channels</span> <span class="o">=</span> <span class="n">config3d</span><span class="o">.</span><span class="n">TARGET_CHANNELS</span>  <span class="c1"># = 15</span>
+        <span class="n">grp</span> <span class="o">=</span> <span class="mi">2</span>  <span class="c1"># self.output_channels</span>
+
+        <span class="n">inner_channels</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">512</span><span class="p">,</span> <span class="n">in_channels</span> <span class="o">//</span> <span class="mi">2</span><span class="p">)</span>  <span class="c1"># Adapt to input channels</span>
+
+        <span class="c1"># First projection conv (reduce channels)</span>
+        <span class="n">layers</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">Conv3d</span><span class="p">(</span>
+                <span class="n">in_channels</span><span class="p">,</span> <span class="n">inner_channels</span> <span class="o">*</span> <span class="n">grp</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">stride</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="mi">0</span>
+            <span class="p">),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm3d</span><span class="p">(</span><span class="n">inner_channels</span> <span class="o">*</span> <span class="n">grp</span><span class="p">),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">LeakyReLU</span><span class="p">(</span><span class="n">negative_slope</span><span class="o">=</span><span class="mf">0.1</span><span class="p">),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">Dropout3d</span><span class="p">(</span><span class="n">p</span><span class="o">=</span><span class="n">dropout_rate</span><span class="p">),</span>
+        <span class="p">]</span>
+
+        <span class="c1"># Add residual hidden blocks</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_hidden_blocks</span><span class="p">):</span>
+            <span class="n">layers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">SuperSeparableBlock</span><span class="p">(</span><span class="n">inner_channels</span> <span class="o">*</span> <span class="n">grp</span><span class="p">,</span> <span class="n">dropout_rate</span><span class="o">=</span><span class="n">dropout_rate</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Output layer</span>
+        <span class="n">layers</span> <span class="o">+=</span> <span class="p">[</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">Conv3d</span><span class="p">(</span>
+                <span class="n">inner_channels</span> <span class="o">*</span> <span class="n">grp</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">output_channels</span><span class="p">,</span>
+                <span class="n">kernel_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">stride</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">padding</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                <span class="n">groups</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="p">),</span>
+        <span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">layers</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span><span class="o">*</span><span class="n">layers</span><span class="p">)</span>
+
+        <span class="c1"># Learnable objectness prior: one scalar per anchor.</span>
+        <span class="c1"># Initialized to a negative value so sigmoid(prior) ≈ 0.018,</span>
+        <span class="c1"># meaning the network starts by predicting few voids.</span>
+        <span class="c1"># The loss gradient adjusts it to match the true data distribution</span>
+        <span class="c1"># within the first few iterations.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">objectness_prior</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">full</span><span class="p">((</span><span class="n">config3d</span><span class="o">.</span><span class="n">NUM_ANCHORS</span><span class="p">,),</span> <span class="n">initial_obj_prior</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Detection head </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">grid_size</span><span class="si">}</span><span class="s2">x</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">grid_size</span><span class="si">}</span><span class="s2">x</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">grid_size</span><span class="si">}</span><span class="s2">: &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;learnable objectness_prior init=</span><span class="si">{</span><span class="n">initial_obj_prior</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;(sigmoid=</span><span class="si">{</span><span class="n">torch</span><span class="o">.</span><span class="n">sigmoid</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">initial_obj_prior</span><span class="p">))</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="Detection3DHead.forward"><a class="viewcode-back" href="../../src.html#src.model.Detection3DHead.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Forward pass for the detection head,</span>
+<span class="sd">        adding the learnable prior to objectness channels.&quot;&quot;&quot;</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">layers</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+        <span class="c1"># Add the learnable prior to objectness channels only.</span>
+        <span class="c1"># out shape: (B, NUM_ANCHORS*5, G, G, G)</span>
+        <span class="c1"># objectness channels: 0, 5, 10, ... (every 5th channel)</span>
+        <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">config3d</span><span class="o">.</span><span class="n">NUM_ANCHORS</span><span class="p">):</span>
+            <span class="n">obj_ch</span> <span class="o">=</span> <span class="n">a</span> <span class="o">*</span> <span class="n">config3d</span><span class="o">.</span><span class="n">CHANNELS_PER_ANCHOR</span>  <span class="c1"># 0, 5, 10, ...</span>
+            <span class="n">out</span><span class="p">[:,</span> <span class="n">obj_ch</span><span class="p">]</span> <span class="o">=</span> <span class="n">out</span><span class="p">[:,</span> <span class="n">obj_ch</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">objectness_prior</span><span class="p">[</span><span class="n">a</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+
+<div class="viewcode-block" id="CosmicVoidDetectionVNet"><a class="viewcode-back" href="../../src.html#src.model.CosmicVoidDetectionVNet">[docs]</a><span class="k">class</span> <span class="nc">CosmicVoidDetectionVNet</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    YOLO v1 3D with multi-scale heads for Void Detection.</span>
+<span class="sd">    Each head has multiple anchors with their own radius multipliers</span>
+<span class="sd">    Compatible with existing dataset.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">    - width_multiplier: float, multiplier for network width (default: 1.0)</span>
+<span class="sd">    - depth_layers: list, additional layers for each depth level (default: [1,1,1,1,1])</span>
+<span class="sd">    - dropout_rate: float, base dropout rate (default: 0.0)</span>
+
+<span class="sd">    Input:</span>
+<span class="sd">    - tensor: shape (batch_size, INPUT_CHANNELS, 128, 128, 128)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    - list: of tensors, one for each scale or head</span>
+<span class="sd">    [</span>
+<span class="sd">    - Scale 2x2x2: (batch, 5*N_ANCHORS, 2, 2, 2)</span>
+<span class="sd">    - Scale 4x4x4: (batch, 5*N_ANCHORS, 4, 4, 4)</span>
+<span class="sd">    - Scale 8x8x8: (batch, 5*N_ANCHORS, 8, 8, 8)</span>
+<span class="sd">    [...]</span>
+<span class="sd">    }</span>
+
+<span class="sd">    Each tensor has 5*N_ANCHORS channels:</span>
+<span class="sd">    For each anchor there is a multiplier:</span>
+<span class="sd">    [anchor*5 + 0] = objectness (void presence probability)</span>
+<span class="sd">    [anchor*5 + 1] = x_offset</span>
+<span class="sd">    [anchor*5 + 2] = y_offset</span>
+<span class="sd">    [anchor*5 + 3] = z_offset</span>
+<span class="sd">    [anchor*5 + 4] = radius_offset (log-scaled, relative to anchor)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">width_multiplier</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">depth_layers</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="n">dropout_rate</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initializes the Cosmic Void Detection Network.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">device</span>
+
+        <span class="c1"># Calculate channels based on width_multiplier</span>
+        <span class="n">base_channels</span> <span class="o">=</span> <span class="p">[</span><span class="mi">32</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="mi">256</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">1024</span><span class="p">]</span>
+        <span class="n">channels</span> <span class="o">=</span> <span class="p">[</span><span class="nb">max</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">ch</span> <span class="o">*</span> <span class="n">width_multiplier</span><span class="p">))</span> <span class="k">for</span> <span class="n">ch</span> <span class="ow">in</span> <span class="n">base_channels</span><span class="p">]</span>
+
+        <span class="c1"># Backbone - Encoder layers with configurable depth</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv_blocks</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">()</span>
+
+        <span class="c1"># Level 1: 4 -&gt; channels[0] -&gt; channels[1]</span>
+        <span class="n">level1_blocks</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">ConvBlock3D</span><span class="p">(</span><span class="n">config3d</span><span class="o">.</span><span class="n">INPUT_CHANNELS</span><span class="p">,</span> <span class="n">channels</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">dropout_rate</span><span class="o">=</span><span class="n">dropout_rate</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">depth_layers</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="n">level1_blocks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="c1"># ConvBlock3D(channels[0], channels[0], kernel_size=3, stride=1, padding=1, dropout_rate=dropout_rate))#</span>
+                <span class="n">SuperSeparableBlock</span><span class="p">(</span><span class="n">channels</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">dropout_rate</span><span class="o">=</span><span class="n">dropout_rate</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="n">level1_blocks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="n">ConvBlock3D</span><span class="p">(</span><span class="n">channels</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">channels</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">dropout_rate</span><span class="o">=</span><span class="n">dropout_rate</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv_blocks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span><span class="o">*</span><span class="n">level1_blocks</span><span class="p">))</span>
+
+        <span class="c1"># Levels 2-5</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">):</span>
+            <span class="n">level_blocks</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">ConvBlock3D</span><span class="p">(</span><span class="n">channels</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">channels</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">],</span> <span class="n">dropout_rate</span><span class="o">=</span><span class="n">dropout_rate</span><span class="p">)</span>
+            <span class="p">]</span>  <span class="c1"># if i &lt; 4 else 0.4)]</span>
+            <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">depth_layers</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="n">level_blocks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="c1"># ConvBlock3D(channels[i + 1], channels[i + 1], kernel_size=3, stride=1, padding=1,</span>
+                    <span class="c1">#                            dropout_rate=dropout_rate if i &lt; 4 else 0.4))</span>
+                    <span class="n">SuperSeparableBlock</span><span class="p">(</span><span class="n">channels</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">],</span> <span class="n">dropout_rate</span><span class="o">=</span><span class="n">dropout_rate</span><span class="p">)</span>
+                <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">conv_blocks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span><span class="o">*</span><span class="n">level_blocks</span><span class="p">))</span>
+
+        <span class="c1"># Upsampling layers for FPN (using dynamic channels)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">upsample4</span> <span class="o">=</span> <span class="n">UpsampleBlock3D</span><span class="p">(</span><span class="n">channels</span><span class="p">[</span><span class="mi">5</span><span class="p">],</span> <span class="n">channels</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>  <span class="c1"># 1024 -&gt; 512</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">upsample3</span> <span class="o">=</span> <span class="n">UpsampleBlock3D</span><span class="p">(</span><span class="n">channels</span><span class="p">[</span><span class="mi">5</span><span class="p">],</span> <span class="n">channels</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>  <span class="c1"># 512 -&gt; 256</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">upsample2</span> <span class="o">=</span> <span class="n">UpsampleBlock3D</span><span class="p">(</span><span class="n">channels</span><span class="p">[</span><span class="mi">4</span><span class="p">],</span> <span class="n">channels</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>  <span class="c1"># 256 -&gt; 128</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">upsample1</span> <span class="o">=</span> <span class="n">UpsampleBlock3D</span><span class="p">(</span><span class="n">channels</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="n">channels</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>  <span class="c1"># 128 -&gt; 64</span>
+
+        <span class="c1"># Feature fusion layers (using dynamic channels)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fusion4</span> <span class="o">=</span> <span class="n">FusionBlock3D</span><span class="p">(</span><span class="n">channels</span><span class="p">[</span><span class="mi">5</span><span class="p">],</span> <span class="n">channels</span><span class="p">[</span><span class="mi">5</span><span class="p">])</span>  <span class="c1"># 1024 -&gt; 512</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fusion3</span> <span class="o">=</span> <span class="n">FusionBlock3D</span><span class="p">(</span><span class="n">channels</span><span class="p">[</span><span class="mi">4</span><span class="p">],</span> <span class="n">channels</span><span class="p">[</span><span class="mi">4</span><span class="p">])</span>  <span class="c1"># 512 -&gt; 256</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fusion2</span> <span class="o">=</span> <span class="n">FusionBlock3D</span><span class="p">(</span><span class="n">channels</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="n">channels</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>  <span class="c1"># 256 -&gt; 128</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fusion1</span> <span class="o">=</span> <span class="n">FusionBlock3D</span><span class="p">(</span><span class="n">channels</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">channels</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>  <span class="c1"># 128 -&gt; 64</span>
+
+        <span class="c1"># Detection heads for each scale (with dynamic number of channels)</span>
+        <span class="c1"># Scale 2x2x2 uses channels[3] (e.g., 256)</span>
+        <span class="c1"># Scale 4x4x4 uses channels[4] (e.g., 512)</span>
+        <span class="c1"># Scale 8x8x8 uses channels[5] (e.g., 1024)</span>
+        <span class="c1"># [...]</span>
+        <span class="n">feature_channels</span> <span class="o">=</span> <span class="p">[</span><span class="n">channels</span><span class="p">[</span><span class="mi">5</span><span class="p">],</span> <span class="n">channels</span><span class="p">[</span><span class="mi">5</span><span class="p">],</span> <span class="n">channels</span><span class="p">[</span><span class="mi">4</span><span class="p">],</span> <span class="n">channels</span><span class="p">[</span><span class="mi">3</span><span class="p">]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">detection_heads</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="n">Detection3DHead</span><span class="p">(</span>
+                    <span class="n">feature_channels</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+                    <span class="n">config3d</span><span class="o">.</span><span class="n">SCALES</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+                    <span class="n">dropout_rate</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+                    <span class="n">num_hidden_blocks</span><span class="o">=</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span>
+                <span class="p">)</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">config3d</span><span class="o">.</span><span class="n">SCALES</span><span class="p">))</span>
+            <span class="p">]</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="CosmicVoidDetectionVNet.initialize_for_void_detection"><a class="viewcode-back" href="../../src.html#src.model.CosmicVoidDetectionVNet.initialize_for_void_detection">[docs]</a>    <span class="k">def</span> <span class="nf">initialize_for_void_detection</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the network to optimize cosmic void detection.</span>
+
+<span class="sd">        This method can be called after model instantiation</span>
+<span class="sd">        to apply specialized initializations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Initializing network for cosmic void detection...&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Detection heads are already initialized in their __init__</span>
+        <span class="c1"># but we can add other initializations here if needed</span>
+
+        <span class="c1"># Example: more conservative initialization of final weights</span>
+        <span class="k">for</span> <span class="n">head</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">detection_heads</span><span class="p">:</span>
+            <span class="c1"># Reduce variance of last layer weights for initial stability</span>
+            <span class="n">last_conv</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">for</span> <span class="n">module</span> <span class="ow">in</span> <span class="n">head</span><span class="o">.</span><span class="n">layers</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv3d</span><span class="p">):</span>
+                    <span class="n">last_conv</span> <span class="o">=</span> <span class="n">module</span>
+
+            <span class="k">if</span> <span class="n">last_conv</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="c1"># Reduce weight variance for more stable convergence</span>
+                <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+                    <span class="n">last_conv</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">data</span> <span class="o">*=</span> <span class="mf">0.1</span>  <span class="c1"># Reduce standard initialization</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Network initialization completed!&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="CosmicVoidDetectionVNet.forward"><a class="viewcode-back" href="../../src.html#src.model.CosmicVoidDetectionVNet.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Forward pass of the cosmic void detection network.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - x: tensor, input of shape (batch_size, INPUT_CHANNELS, 128, 128, 128)</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - list:  of tensors, one for each scale</span>
+<span class="sd">        Each tensor has shape: (batch, 5*N_ANCHORS, grid_size, grid_size, grid_size)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Backbone - Encoder path with configurable depth</span>
+        <span class="n">encoder_features</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">current_x</span> <span class="o">=</span> <span class="n">x</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">conv_block</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conv_blocks</span><span class="p">):</span>
+            <span class="n">current_x</span> <span class="o">=</span> <span class="n">conv_block</span><span class="p">(</span><span class="n">current_x</span><span class="p">)</span>
+            <span class="n">encoder_features</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">current_x</span><span class="p">)</span>
+
+        <span class="c1"># Assign extracted features (5 levels from encoder)</span>
+        <span class="n">_x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">x3</span><span class="p">,</span> <span class="n">x4</span><span class="p">,</span> <span class="n">x5</span> <span class="o">=</span> <span class="n">encoder_features</span>
+
+        <span class="c1"># Feature pyramid with fusion and iterative masking</span>
+        <span class="c1"># Scale 2x2x2 (smallest, deepest features)</span>
+        <span class="n">feat_2x2x2</span> <span class="o">=</span> <span class="n">x5</span>
+        <span class="n">det2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">detection_heads</span><span class="p">[</span><span class="mi">0</span><span class="p">](</span><span class="n">feat_2x2x2</span><span class="p">)</span>
+
+        <span class="c1"># Scale 4x4x4</span>
+        <span class="n">up4</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">upsample4</span><span class="p">(</span><span class="n">feat_2x2x2</span><span class="p">)</span>
+        <span class="n">feat_4x4x4</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fusion4</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">up4</span><span class="p">,</span> <span class="n">x4</span><span class="p">],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">det4</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">detection_heads</span><span class="p">[</span><span class="mi">1</span><span class="p">](</span><span class="n">feat_4x4x4</span><span class="p">)</span>
+
+        <span class="c1"># Scale 8x8x8</span>
+        <span class="n">up3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">upsample3</span><span class="p">(</span><span class="n">feat_4x4x4</span><span class="p">)</span>
+        <span class="n">feat_8x8x8</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fusion3</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">up3</span><span class="p">,</span> <span class="n">x3</span><span class="p">],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">det8</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">detection_heads</span><span class="p">[</span><span class="mi">2</span><span class="p">](</span><span class="n">feat_8x8x8</span><span class="p">)</span>
+
+        <span class="c1"># Scale 16x16x16</span>
+        <span class="k">if</span> <span class="n">NUM_HEADS</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">up2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">upsample2</span><span class="p">(</span><span class="n">feat_8x8x8</span><span class="p">)</span>
+            <span class="n">feat_16x16x16</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fusion2</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">up2</span><span class="p">,</span> <span class="n">x2</span><span class="p">],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+            <span class="n">det16</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">detection_heads</span><span class="p">[</span><span class="mi">3</span><span class="p">](</span><span class="n">feat_16x16x16</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">det2</span><span class="p">,</span> <span class="n">det4</span><span class="p">,</span> <span class="n">det8</span><span class="p">,</span> <span class="n">det16</span><span class="p">]</span>
+
+        <span class="c1"># Return only the 3 detections</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">det2</span><span class="p">,</span> <span class="n">det4</span><span class="p">,</span> <span class="n">det8</span><span class="p">]</span></div></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">DeepCosmoNet Voids</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2026, Vincenzo Del Zoppo.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 5.3.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

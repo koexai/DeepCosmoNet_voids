@@ -1,0 +1,1154 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+    <title>src package &#8212; DeepCosmoNet Voids 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="src-package">
+<h1>src package<a class="headerlink" href="#src-package" title="Permalink to this heading">¶</a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this heading">¶</a></h2>
+</section>
+<section id="module-src.augmentation">
+<span id="src-augmentation-module"></span><h2>src.augmentation module<a class="headerlink" href="#module-src.augmentation" title="Permalink to this heading">¶</a></h2>
+<p>This file is meant to contain the code for augmentation</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="src.augmentation.random_flip">
+<span class="sig-prename descclassname"><span class="pre">src.augmentation.</span></span><span class="sig-name descname"><span class="pre">random_flip</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">voids_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">particles_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">o_x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">o_y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">o_z</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/augmentation.html#random_flip"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.augmentation.random_flip" title="Permalink to this definition">¶</a></dt>
+<dd><p>Randomly flips the sign of each axis (x, y, z) with 50% probability
+for both dataframes and offsets, and applies a +1 shift when flipping
+to account for uncentered coordinates (e.g., [0, 1] range).</p>
+<p>Parameters:
+- voids_df: pd.DataFrame with columns [‘x’, ‘y’, ‘z’]
+- particles_df: pd.DataFrame with columns [‘x’, ‘y’, ‘z’]
+- o_x, o_y, o_z: float offsets</p>
+<p>Returns:
+- voids_df, particles_df, new_o_x, new_o_y, new_o_z</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.augmentation.random_permute">
+<span class="sig-prename descclassname"><span class="pre">src.augmentation.</span></span><span class="sig-name descname"><span class="pre">random_permute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">voids_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">particles_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">o_x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">o_y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">o_z</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/augmentation.html#random_permute"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.augmentation.random_permute" title="Permalink to this definition">¶</a></dt>
+<dd><p>In-place axis permutation for both dataframes and offsets by renaming columns only.</p>
+<p>Parameters:
+- voids_df: pd.DataFrame with columns [‘x’, ‘y’, ‘z’]
+- particles_df: pd.DataFrame with columns [‘x’, ‘y’, ‘z’]
+- o_x, o_y, o_z: float offsets for x, y, z</p>
+<p>Returns:
+- voids_df, particles_df, new_ox, new_oy, new_oz</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.augmentation.test_augmentation">
+<span class="sig-prename descclassname"><span class="pre">src.augmentation.</span></span><span class="sig-name descname"><span class="pre">test_augmentation</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/augmentation.html#test_augmentation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.augmentation.test_augmentation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Test the random_permute and random_flip functions with a tiny synthetic dataset.</p>
+</dd></dl>
+
+</section>
+<section id="module-src.dcn_config">
+<span id="src-dcn-config-module"></span><h2>src.dcn_config module<a class="headerlink" href="#module-src.dcn_config" title="Permalink to this heading">¶</a></h2>
+<p>This module defines the paths for data and outputs using a standardized,
+deploy-ready project structure, and stores all global project-wide configuration constants.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="src.dcn_config.get_dataset_paths">
+<span class="sig-prename descclassname"><span class="pre">src.dcn_config.</span></span><span class="sig-name descname"><span class="pre">get_dataset_paths</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/dcn_config.html#get_dataset_paths"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.dcn_config.get_dataset_paths" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the dataset paths for particles and voids for both train and val sets.</p>
+<dl class="simple">
+<dt>Structure expected:</dt><dd><p>project_root/
+├── data/
+│   ├── voxel_particles_train/
+│   ├── voxel_particles_val/
+│   ├── voxel_void_train/
+│   └── voxel_void_val/</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.dcn_config.get_output_paths">
+<span class="sig-prename descclassname"><span class="pre">src.dcn_config.</span></span><span class="sig-name descname"><span class="pre">get_output_paths</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/dcn_config.html#get_output_paths"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.dcn_config.get_output_paths" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the output path for models and logs.</p>
+<dl class="simple">
+<dt>Structure expected:</dt><dd><p>project_root/
+└── output/</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-src.dataset">
+<span id="src-dataset-module"></span><h2>src.dataset module<a class="headerlink" href="#module-src.dataset" title="Permalink to this heading">¶</a></h2>
+<p>This module aims to format the data at the input and output of the network
+with multi-anchor support and sliding window on radius subsets.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="src.dataset.VoidDataset">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.dataset.</span></span><span class="sig-name descname"><span class="pre">VoidDataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">particles_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">voids_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">augment</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/dataset.html#VoidDataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.dataset.VoidDataset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Dataset</span></code></p>
+<p>Overrides the PyTorch DataSet Class specific for our use case
+with multi-anchor support.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.dataset.sort_voids_by_radius">
+<span class="sig-prename descclassname"><span class="pre">src.dataset.</span></span><span class="sig-name descname"><span class="pre">sort_voids_by_radius</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">voids</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/dataset.html#sort_voids_by_radius"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.dataset.sort_voids_by_radius" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sorts voids from a dataframe into subsets based on radius bins.
+Uses a fine-grained logarithmic scale for sliding window anchor assignment.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>Dataframe</strong> (<em>pandas</em>) – voids with columns ‘x’, ‘y’, ‘z’, ‘radius’</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>voids subsets sorted by radius in descending order</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of Dataframes</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.dataset.target_to_voids">
+<span class="sig-prename descclassname"><span class="pre">src.dataset.</span></span><span class="sig-name descname"><span class="pre">target_to_voids</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">anchor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">o_x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">o_y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">o_z</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thresh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/dataset.html#target_to_voids"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.dataset.target_to_voids" title="Permalink to this definition">¶</a></dt>
+<dd><p>Opposite function of voids_to_targets.
+:param tensor: Tensor of shape (B, 5, grid_size, grid_size, grid_size)
+:param integers o_x: the offset of the cube in the universe
+:param o_y: the offset of the cube in the universe
+:param o_z: the offset of the cube in the universe
+:param thresh: 0.5 if after sigmoid 0.0 if before sigmoid</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dataframe of voids ‘x’, ‘y’, ‘z’, ‘radius’</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>pandas Dataframe</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.dataset.void_data_loader">
+<span class="sig-prename descclassname"><span class="pre">src.dataset.</span></span><span class="sig-name descname"><span class="pre">void_data_loader</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">batch_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_train</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_val</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/dataset.html#void_data_loader"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.dataset.void_data_loader" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates PyTorch DataLoader objects for training and validation datasets.</p>
+<p>Parameters:
+- batch_size: int, size of each batch for data loading (default: 16)
+- max_train: int or None, if set limits the training set to this many samples
+- max_val: int or None, if set limits the validation set to this many samples</p>
+<p>Returns:
+- train_loader, val_loader: two PyTorch DataLoader objects for train and validation</p>
+</dd></dl>
+
+</section>
+<section id="module-src.features">
+<span id="src-features-module"></span><h2>src.features module<a class="headerlink" href="#module-src.features" title="Permalink to this heading">¶</a></h2>
+<p>This module contains functions to prepare multi-channel input for void detection
+using Gaussian smoothing at different scales.
+The main function, <cite>prepare_void_detection_input</cite>, takes a 3D density tensor
+and applies Gaussian filters with varying sigma values
+to create multiple feature channels.
+Each channel is then log-transformed and standardized to optimize it
+for void detection tasks.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="src.features.prepare_void_detection_input">
+<span class="sig-prename descclassname"><span class="pre">src.features.</span></span><span class="sig-name descname"><span class="pre">prepare_void_detection_input</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">microvoxel_data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/features.html#prepare_void_detection_input"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.features.prepare_void_detection_input" title="Permalink to this definition">¶</a></dt>
+<dd><p>Prepares multi-channel input for void detection.</p>
+<p>Parameters:
+- microvoxel_data: ndarray, shape (128, 128, 128), 3D density tensor obtained from np.histogramdd</p>
+<p>Returns:
+- input_tensor: torch.Tensor, shape (4, 128, 128, 128), 4-channel tensor optimized for void detection at different scales</p>
+</dd></dl>
+
+</section>
+<section id="module-src.filter_overlap">
+<span id="src-filter-overlap-module"></span><h2>src.filter_overlap module<a class="headerlink" href="#module-src.filter_overlap" title="Permalink to this heading">¶</a></h2>
+<p>This filter mimics the pylians filter where smaller voids overlapped
+with bigger ones are deleted</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="src.filter_overlap.filter_smaller_touching_spheres">
+<span class="sig-prename descclassname"><span class="pre">src.filter_overlap.</span></span><span class="sig-name descname"><span class="pre">filter_smaller_touching_spheres</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">touches</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/filter_overlap.html#filter_smaller_touching_spheres"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.filter_overlap.filter_smaller_touching_spheres" title="Permalink to this definition">¶</a></dt>
+<dd><p>Given a boolean matrix where touches[i, j] is True if sphere i and j overlap.
+Assumes spheres are ordered from largest to smallest.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.filter_overlap.filter_touching_spheres">
+<span class="sig-prename descclassname"><span class="pre">src.filter_overlap.</span></span><span class="sig-name descname"><span class="pre">filter_touching_spheres</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spheres</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/filter_overlap.html#filter_touching_spheres"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.filter_overlap.filter_touching_spheres" title="Permalink to this definition">¶</a></dt>
+<dd><p>Filters out smaller spheres that touch larger ones.
+Assumes ‘spheres’ is a DataFrame with columns ‘x’, ‘y’,
+‘z’ (optional) and ‘radius’, sorted by radius in descending order.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.filter_overlap.run_test_and_plot">
+<span class="sig-prename descclassname"><span class="pre">src.filter_overlap.</span></span><span class="sig-name descname"><span class="pre">run_test_and_plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_points</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/filter_overlap.html#run_test_and_plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.filter_overlap.run_test_and_plot" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generates random spheres, applies the filter, and plots before/after.</p>
+</dd></dl>
+
+</section>
+<section id="module-src.full_grid_tensor">
+<span id="src-full-grid-tensor-module"></span><h2>src.full_grid_tensor module<a class="headerlink" href="#module-src.full_grid_tensor" title="Permalink to this heading">¶</a></h2>
+<p>This module contains the main function to convert void proposals
+into a full 3D grid tensor, and a reusable BoxClusterer class
+for clustering boxes based on IoU.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="src.full_grid_tensor.BoxClusterer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.full_grid_tensor.</span></span><span class="sig-name descname"><span class="pre">BoxClusterer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">min_cluster_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cluster_selection_epsilon</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/full_grid_tensor.html#BoxClusterer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.full_grid_tensor.BoxClusterer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Reusable clusterer for grouping boxes based on precomputed IoU matrix.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.full_grid_tensor.BoxClusterer.cluster">
+<span class="sig-name descname"><span class="pre">cluster</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">iou_mat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="reference internal" href="_modules/src/full_grid_tensor.html#BoxClusterer.cluster"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.full_grid_tensor.BoxClusterer.cluster" title="Permalink to this definition">¶</a></dt>
+<dd><p>Cluster boxes using precomputed IoU matrix.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>iou_mat</strong> – torch.Tensor (N,N) IoU matrix in float32</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>torch.Tensor (N,) with cluster IDs</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>labels</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.full_grid_tensor.group_means">
+<span class="sig-prename descclassname"><span class="pre">src.full_grid_tensor.</span></span><span class="sig-name descname"><span class="pre">group_means</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">labels</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_outliers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="_modules/src/full_grid_tensor.html#group_means"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.full_grid_tensor.group_means" title="Permalink to this definition">¶</a></dt>
+<dd><p>Groups rows in df by cluster labels and averages values for clusters (label &gt;= 0).
+Outliers (label == -1) are either dropped or appended as-is depending on exclude_outliers.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<em>pd.DataFrame</em>) – Input dataframe to group.</p></li>
+<li><p><strong>labels</strong> (<em>np.ndarray</em>) – Cluster labels from DBSCAN (same length as df).</p></li>
+<li><p><strong>exclude_outliers</strong> (<em>bool</em><em>, </em><em>default True</em>) – If True, outliers (label == -1) are dropped.
+If False, outliers are appended as-is to the result.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>pd.DataFrame with aggregated cluster means (and optionally outliers).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.full_grid_tensor.group_means_with_outliers_">
+<span class="sig-prename descclassname"><span class="pre">src.full_grid_tensor.</span></span><span class="sig-name descname"><span class="pre">group_means_with_outliers_</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">labels</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="_modules/src/full_grid_tensor.html#group_means_with_outliers_"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.full_grid_tensor.group_means_with_outliers_" title="Permalink to this definition">¶</a></dt>
+<dd><p>Groups rows in df by cluster labels, averages values for clusters (label &gt;= 0),
+and appends outliers (label == -1) as-is.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<em>pd.DataFrame</em>) – Input dataframe to group.</p></li>
+<li><p><strong>labels</strong> (<em>np.ndarray</em>) – Cluster labels from HDBSCAN (same length as df).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>pd.DataFrame with aggregated cluster means and ungrouped outliers.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.full_grid_tensor.group_means_without_outliers_">
+<span class="sig-prename descclassname"><span class="pre">src.full_grid_tensor.</span></span><span class="sig-name descname"><span class="pre">group_means_without_outliers_</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">labels</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="_modules/src/full_grid_tensor.html#group_means_without_outliers_"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.full_grid_tensor.group_means_without_outliers_" title="Permalink to this definition">¶</a></dt>
+<dd><p>Groups rows in df by cluster labels, averages values for clusters (label &gt;= 0),
+and DROPS outliers (label == -1) — single detections in a cell are spurious proposals.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<em>pd.DataFrame</em>) – Input dataframe to group.</p></li>
+<li><p><strong>labels</strong> (<em>np.ndarray</em>) – Cluster labels from DBSCAN (same length as df).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>pd.DataFrame with aggregated cluster means only (no spurious proposals).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.full_grid_tensor.print_tensor_summary">
+<span class="sig-prename descclassname"><span class="pre">src.full_grid_tensor.</span></span><span class="sig-name descname"><span class="pre">print_tensor_summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tensor</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/full_grid_tensor.html#print_tensor_summary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.full_grid_tensor.print_tensor_summary" title="Permalink to this definition">¶</a></dt>
+<dd><p>Nicely print the tensor content per grid cell.
+Only prints active cells (confidence &gt; 0).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.full_grid_tensor.voids_to_target_full_grid">
+<span class="sig-prename descclassname"><span class="pre">src.full_grid_tensor.</span></span><span class="sig-name descname"><span class="pre">voids_to_target_full_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">subset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">anchor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid_size</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">o_x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">o_y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">o_z</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/full_grid_tensor.html#voids_to_target_full_grid"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.full_grid_tensor.voids_to_target_full_grid" title="Permalink to this definition">¶</a></dt>
+<dd><p>Assign every grid cell to the closest void using KDTree,
+and mask out cells that are outside the void radius.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>subset</strong> – pandas DataFrame with columns [‘x’, ‘y’, ‘z’, ‘radius’]</p></li>
+<li><p><strong>anchor</strong> – int, anchor index (0, 1, or 2) for radius scaling</p></li>
+<li><p><strong>grid_size</strong> – int, size of the 3D output grid</p></li>
+<li><p><strong>o_x</strong> – int offsets in voxel space</p></li>
+<li><p><strong>o_y</strong> – int offsets in voxel space</p></li>
+<li><p><strong>o_z</strong> – int offsets in voxel space</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>shape (5, grid_size, grid_size, grid_size)</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tensor</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-src.log_experiments">
+<span id="src-log-experiments-module"></span><h2>src.log_experiments module<a class="headerlink" href="#module-src.log_experiments" title="Permalink to this heading">¶</a></h2>
+<p>this module saves the code at each experiment that we run
+to not lose track of small changes between the commits</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="src.log_experiments.save_code">
+<span class="sig-prename descclassname"><span class="pre">src.log_experiments.</span></span><span class="sig-name descname"><span class="pre">save_code</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">zip_file_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">folder</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/log_experiments.html#save_code"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.log_experiments.save_code" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a zip archive of the specified folder.</p>
+<p>Parameters:
+- zip_file_name: str, name of the output zip file
+- folder: str, path to the folder to zip (default: “.”)</p>
+<p>Returns:
+- None</p>
+</dd></dl>
+
+</section>
+<section id="module-src.logger_matplotlib">
+<span id="src-logger-matplotlib-module"></span><h2>src.logger_matplotlib module<a class="headerlink" href="#module-src.logger_matplotlib" title="Permalink to this heading">¶</a></h2>
+<p>this module is meant to plot the training progress live using matplotlib</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="src.logger_matplotlib.LivePlot">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.logger_matplotlib.</span></span><span class="sig-name descname"><span class="pre">LivePlot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Training</span> <span class="pre">Progress'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/logger_matplotlib.html#LivePlot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.logger_matplotlib.LivePlot" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>The class represents a matplotlib live plot for a single metric</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.logger_matplotlib.LivePlot.save">
+<span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">folder</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/logger_matplotlib.html#LivePlot.save"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.logger_matplotlib.LivePlot.save" title="Permalink to this definition">¶</a></dt>
+<dd><p>Saves the live plot to a folder
+:param folder: path to save the figure</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.logger_matplotlib.LivePlot.update">
+<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/logger_matplotlib.html#LivePlot.update"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.logger_matplotlib.LivePlot.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates the plot
+:param dot: the new value to add to the plot
+:param mode: “train” or “val</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.logger_matplotlib.test_live_plot">
+<span class="sig-prename descclassname"><span class="pre">src.logger_matplotlib.</span></span><span class="sig-name descname"><span class="pre">test_live_plot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/logger_matplotlib.html#test_live_plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.logger_matplotlib.test_live_plot" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tests the live plot function.</p>
+<p>Returns:
+- None</p>
+</dd></dl>
+
+</section>
+<section id="module-src.losses">
+<span id="src-losses-module"></span><h2>src.losses module<a class="headerlink" href="#module-src.losses" title="Permalink to this heading">¶</a></h2>
+<p>This module contains the definition of the loss function
+and main detection metrics for the yolo network with multi-anchor support</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="src.losses.UncertaintyLoss">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.losses.</span></span><span class="sig-name descname"><span class="pre">UncertaintyLoss</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_lambdas</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/losses.html#UncertaintyLoss"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.losses.UncertaintyLoss" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
+<p>Automatic loss weighting using learned uncertainty.</p>
+<p>Learns optimal weights for multiple loss components by treating
+task uncertainty as learnable parameters.</p>
+<p>Reference: “Multi-Task Learning Using Uncertainty to Weigh Losses
+for Scene Geometry and Semantics” (Kendall et al., 2018)</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.losses.UncertaintyLoss.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">losses</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/losses.html#UncertaintyLoss.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.losses.UncertaintyLoss.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Parameters:
+- losses: torch.Tensor of shape (num_lambdas,) containing individual losses</p>
+<p>Returns:
+- torch.Tensor: scalar combined loss</p>
+<p>Formula: L_total = Σ(1/(2sigma²) * L_i + log(sigma))
+where σ² = exp(log_var)</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.losses.UncertaintyLoss.training">
+<span class="sig-name descname"><span class="pre">training</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#src.losses.UncertaintyLoss.training" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="src.losses.YOLO3DLoss">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.losses.</span></span><span class="sig-name descname"><span class="pre">YOLO3DLoss</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">objectness_weight</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_weight</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">radius_weight</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">focal_alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">focal_gamma</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_anchors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/losses.html#YOLO3DLoss"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.losses.YOLO3DLoss" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
+<p>This class handles the hyperparameter of a Yolo-like loss function
+with multi-anchor support (3 anchors per detection head)</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.losses.YOLO3DLoss.compute_single_anchor_loss">
+<span class="sig-name descname"><span class="pre">compute_single_anchor_loss</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pred_anchor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_anchor</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/losses.html#YOLO3DLoss.compute_single_anchor_loss"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.losses.YOLO3DLoss.compute_single_anchor_loss" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes the loss for a single anchor.</p>
+<p>Parameters:
+- pred_anchor: torch.Tensor, shape (5, grid_size, grid_size, grid_size)
+- target_anchor: torch.Tensor, shape (5, grid_size, grid_size, grid_size)</p>
+<p>Returns:
+- dict: dictionary with losses for this anchor</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.losses.YOLO3DLoss.focal_loss">
+<span class="sig-name descname"><span class="pre">focal_loss</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pred</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/losses.html#YOLO3DLoss.focal_loss"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.losses.YOLO3DLoss.focal_loss" title="Permalink to this definition">¶</a></dt>
+<dd><p>Focal Loss for objectness detection with automatic handling of logits/probabilities.</p>
+<p>Implements the formula: FL(p_t) = -alpha_t * (1 - p_t)^gamma * CE(pred, target)
+where alpha_t is applied only to the positive class to encourage detection.</p>
+<p>Parameters:
+- pred: torch.Tensor, shape (grid, grid, grid), predictions
+- If logits: unbounded values
+- If probabilities: values in [0,1]
+- target: torch.Tensor, shape (grid, grid, grid), ground truth binary values (0 or 1)</p>
+<p>Returns:
+- torch.Tensor: normalized scalar focal loss value</p>
+<p>Note:
+- focal_alpha &gt; 1: pushes model towards detection (more weight to positive class)
+- focal_gamma &gt; 0: reduces weight of easy examples, focuses on hard ones</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.losses.YOLO3DLoss.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pred</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/losses.html#YOLO3DLoss.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.losses.YOLO3DLoss.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes the loss for multi-anchor predictions.</p>
+<p>Parameters:
+- pred: torch.Tensor, shape (15, grid_size, grid_size, grid_size) for 3 anchors
+or (5, grid_size, grid_size, grid_size) for backward compatibility
+- target: torch.Tensor, same shape as pred</p>
+<p>Returns:
+- dict: dictionary with combined losses compatible with train.py</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.losses.YOLO3DLoss.training">
+<span class="sig-name descname"><span class="pre">training</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#src.losses.YOLO3DLoss.training" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-src.main">
+<span id="src-main-module"></span><h2>src.main module<a class="headerlink" href="#module-src.main" title="Permalink to this heading">¶</a></h2>
+<p>this module is meant to save a snapshot of the training code and start the training</p>
+</section>
+<section id="module-src.metrics">
+<span id="src-metrics-module"></span><h2>src.metrics module<a class="headerlink" href="#module-src.metrics" title="Permalink to this heading">¶</a></h2>
+<p>This module contains the additional detection metrics
+to ensure the effective match between the predicted voids and the gt ones</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="src.metrics.compute_accuracy">
+<span class="sig-prename descclassname"><span class="pre">src.metrics.</span></span><span class="sig-name descname"><span class="pre">compute_accuracy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">predictions</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">targets</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thresh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/metrics.html#compute_accuracy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.metrics.compute_accuracy" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates the accuracy for the object score</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>predictions</strong> – predicted tensor (B, 5, L, L, L)</p></li>
+<li><p><strong>targets</strong> – target tensor (B, 5, L, L, L)</p></li>
+<li><p><strong>thresh</strong> – classification threshold</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>dict with accuracy metrics</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.metrics.compute_cen_rad_iou_prec_rec_f1">
+<span class="sig-prename descclassname"><span class="pre">src.metrics.</span></span><span class="sig-name descname"><span class="pre">compute_cen_rad_iou_prec_rec_f1</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df_pred</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">df_target</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/metrics.html#compute_cen_rad_iou_prec_rec_f1"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.metrics.compute_cen_rad_iou_prec_rec_f1" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes:
+- average relative centroid error
+- average relative radius error
+- average IoU
+- precision
+- recall
+- f1
+Pairs with distance &gt; target radius are discarded.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.metrics.spheres_iou">
+<span class="sig-prename descclassname"><span class="pre">src.metrics.</span></span><span class="sig-name descname"><span class="pre">spheres_iou</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ra</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rb</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">d</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/metrics.html#spheres_iou"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.metrics.spheres_iou" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute average IoU between pairs of spheres (GPU-optimized, no boolean indexing).
+All computations are batched with torch.where.</p>
+</dd></dl>
+
+</section>
+<section id="module-src.model">
+<span id="src-model-module"></span><h2>src.model module<a class="headerlink" href="#module-src.model" title="Permalink to this heading">¶</a></h2>
+<p>Cosmic Void Detection Network - Modular YOLO v1 3D with Multi-Scale Heads
+This implementation defines a flexible 3D detection network inspired by YOLO v1,
+adapted for cosmic void detection in 3D cosmological data.
+The architecture includes a backbone with configurable depth,
+a feature pyramid with fusion, and multiple detection heads.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="src.model.Config3D">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.model.</span></span><span class="sig-name descname"><span class="pre">Config3D</span></span><a class="reference internal" href="_modules/src/model.html#Config3D"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.model.Config3D" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Configuration class for the 3D YOLO-based cosmic void detection network.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.model.Config3D.ANCHOR_MULTIPLIERS">
+<span class="sig-name descname"><span class="pre">ANCHOR_MULTIPLIERS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">array([1.31950791,</span> <span class="pre">1.14869835,</span> <span class="pre">1.</span>&#160;&#160;&#160;&#160;&#160;&#160;&#160; <span class="pre">,</span> <span class="pre">0.87055056,</span> <span class="pre">0.75785828])</span></em><a class="headerlink" href="#src.model.Config3D.ANCHOR_MULTIPLIERS" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.model.Config3D.CHANNELS_PER_ANCHOR">
+<span class="sig-name descname"><span class="pre">CHANNELS_PER_ANCHOR</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">5</span></em><a class="headerlink" href="#src.model.Config3D.CHANNELS_PER_ANCHOR" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.model.Config3D.INPUT_CHANNELS">
+<span class="sig-name descname"><span class="pre">INPUT_CHANNELS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">5</span></em><a class="headerlink" href="#src.model.Config3D.INPUT_CHANNELS" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.model.Config3D.INPUT_SIZE">
+<span class="sig-name descname"><span class="pre">INPUT_SIZE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">(128,</span> <span class="pre">128,</span> <span class="pre">128)</span></em><a class="headerlink" href="#src.model.Config3D.INPUT_SIZE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.model.Config3D.NUM_ANCHORS">
+<span class="sig-name descname"><span class="pre">NUM_ANCHORS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">5</span></em><a class="headerlink" href="#src.model.Config3D.NUM_ANCHORS" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.model.Config3D.SCALES">
+<span class="sig-name descname"><span class="pre">SCALES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[2,</span> <span class="pre">4,</span> <span class="pre">8,</span> <span class="pre">16]</span></em><a class="headerlink" href="#src.model.Config3D.SCALES" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.model.Config3D.TARGET_CHANNELS">
+<span class="sig-name descname"><span class="pre">TARGET_CHANNELS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">25</span></em><a class="headerlink" href="#src.model.Config3D.TARGET_CHANNELS" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="src.model.ConvBlock3D">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.model.</span></span><span class="sig-name descname"><span class="pre">ConvBlock3D</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">in_channels</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">out_channels</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stride</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">padding</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dropout_rate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/model.html#ConvBlock3D"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.model.ConvBlock3D" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
+<p>Reusable 3D convolutional block.</p>
+<p>Parameters:
+- in_channels: int, number of input channels
+- out_channels: int, number of output channels
+- kernel_size: int, convolution kernel size (default: 2)
+- stride: int, convolution stride (default: 2)
+- padding: int, convolution padding (default: 0)
+- dropout_rate: float, dropout probability (default: 0.0)</p>
+<p>Returns:
+- tensor: processed feature tensor</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.model.ConvBlock3D.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/model.html#ConvBlock3D.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.model.ConvBlock3D.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Forward pass for the convolutional block.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.model.ConvBlock3D.training">
+<span class="sig-name descname"><span class="pre">training</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#src.model.ConvBlock3D.training" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="src.model.CosmicVoidDetectionVNet">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.model.</span></span><span class="sig-name descname"><span class="pre">CosmicVoidDetectionVNet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">width_multiplier</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">depth_layers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(5,</span> <span class="pre">2,</span> <span class="pre">2,</span> <span class="pre">2,</span> <span class="pre">2)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dropout_rate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cuda'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/model.html#CosmicVoidDetectionVNet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.model.CosmicVoidDetectionVNet" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
+<p>YOLO v1 3D with multi-scale heads for Void Detection.
+Each head has multiple anchors with their own radius multipliers
+Compatible with existing dataset.</p>
+<p>Parameters:
+- width_multiplier: float, multiplier for network width (default: 1.0)
+- depth_layers: list, additional layers for each depth level (default: [1,1,1,1,1])
+- dropout_rate: float, base dropout rate (default: 0.0)</p>
+<p>Input:
+- tensor: shape (batch_size, INPUT_CHANNELS, 128, 128, 128)</p>
+<p>Returns:
+- list: of tensors, one for each scale or head
+[
+- Scale 2x2x2: (batch, 5*N_ANCHORS, 2, 2, 2)
+- Scale 4x4x4: (batch, 5*N_ANCHORS, 4, 4, 4)
+- Scale 8x8x8: (batch, 5*N_ANCHORS, 8, 8, 8)
+[…]
+}</p>
+<p>Each tensor has 5*N_ANCHORS channels:
+For each anchor there is a multiplier:
+[anchor*5 + 0] = objectness (void presence probability)
+[anchor*5 + 1] = x_offset
+[anchor*5 + 2] = y_offset
+[anchor*5 + 3] = z_offset
+[anchor*5 + 4] = radius_offset (log-scaled, relative to anchor)</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.model.CosmicVoidDetectionVNet.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/model.html#CosmicVoidDetectionVNet.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.model.CosmicVoidDetectionVNet.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Forward pass of the cosmic void detection network.</p>
+<p>Parameters:
+- x: tensor, input of shape (batch_size, INPUT_CHANNELS, 128, 128, 128)</p>
+<p>Returns:
+- list:  of tensors, one for each scale
+Each tensor has shape: (batch, 5*N_ANCHORS, grid_size, grid_size, grid_size)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.model.CosmicVoidDetectionVNet.initialize_for_void_detection">
+<span class="sig-name descname"><span class="pre">initialize_for_void_detection</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/model.html#CosmicVoidDetectionVNet.initialize_for_void_detection"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.model.CosmicVoidDetectionVNet.initialize_for_void_detection" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes the network to optimize cosmic void detection.</p>
+<p>This method can be called after model instantiation
+to apply specialized initializations.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.model.CosmicVoidDetectionVNet.training">
+<span class="sig-name descname"><span class="pre">training</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#src.model.CosmicVoidDetectionVNet.training" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="src.model.Detection3DHead">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.model.</span></span><span class="sig-name descname"><span class="pre">Detection3DHead</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">in_channels</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid_size</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dropout_rate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_hidden_blocks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_obj_prior</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/model.html#Detection3DHead"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.model.Detection3DHead" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
+<p>Flexible 3D detection head with multiple anchors.</p>
+<p>Parameters:
+- in_channels: int, number of input channels
+- grid_size: int, size of the output grid
+- dropout_rate: float, dropout probability (default: 0.0)
+- num_hidden_blocks: int, number of hidden conv blocks to insert (default: 1)</p>
+<p>Returns:
+- tensor: shape (5*NUM_ANCHORS, grid_size, grid_size, grid_size)
+For each anchor:
+[anchor*5 + 0] = objectness (void presence probability)
+[anchor*5 + 1] = x_offset
+[anchor*5 + 2] = y_offset
+[anchor*5 + 3] = z_offset
+[anchor*5 + 4] = radius_offset (log-scaled, relative to anchor multiplier)</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.model.Detection3DHead.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/model.html#Detection3DHead.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.model.Detection3DHead.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Forward pass for the detection head,
+adding the learnable prior to objectness channels.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.model.Detection3DHead.training">
+<span class="sig-name descname"><span class="pre">training</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#src.model.Detection3DHead.training" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="src.model.FusionBlock3D">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.model.</span></span><span class="sig-name descname"><span class="pre">FusionBlock3D</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">in_channels</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">out_channels</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/model.html#FusionBlock3D"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.model.FusionBlock3D" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
+<p>Reusable feature fusion block.</p>
+<p>Parameters:
+- in_channels: int, number of input channels
+- out_channels: int, number of output channels</p>
+<p>Returns:
+- tensor: fused feature tensor</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.model.FusionBlock3D.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/model.html#FusionBlock3D.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.model.FusionBlock3D.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Forward pass for the fusion block.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.model.FusionBlock3D.training">
+<span class="sig-name descname"><span class="pre">training</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#src.model.FusionBlock3D.training" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="src.model.SuperSeparableBlock">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.model.</span></span><span class="sig-name descname"><span class="pre">SuperSeparableBlock</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">channels</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dropout_rate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/model.html#SuperSeparableBlock"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.model.SuperSeparableBlock" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
+<p>A residual hidden block: Conv3d -&gt; BN -&gt; LeakyReLU -&gt; Dropout, with skip connection.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.model.SuperSeparableBlock.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/model.html#SuperSeparableBlock.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.model.SuperSeparableBlock.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Forward pass for the SuperSeparableBlock with a skip connection.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.model.SuperSeparableBlock.training">
+<span class="sig-name descname"><span class="pre">training</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#src.model.SuperSeparableBlock.training" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="src.model.UpsampleBlock3D">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.model.</span></span><span class="sig-name descname"><span class="pre">UpsampleBlock3D</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">in_channels</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">out_channels</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dropout_rate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/model.html#UpsampleBlock3D"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.model.UpsampleBlock3D" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
+<p>Reusable 3D upsampling block.</p>
+<p>Parameters:
+- in_channels: int, number of input channels
+- out_channels: int, number of output channels
+- dropout_rate: float, dropout probability (default: 0.0)</p>
+<p>Returns:
+- tensor: upsampled feature tensor</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.model.UpsampleBlock3D.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/model.html#UpsampleBlock3D.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.model.UpsampleBlock3D.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Forward pass for the upsampling block.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.model.UpsampleBlock3D.training">
+<span class="sig-name descname"><span class="pre">training</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#src.model.UpsampleBlock3D.training" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-src.profiler">
+<span id="src-profiler-module"></span><h2>src.profiler module<a class="headerlink" href="#module-src.profiler" title="Permalink to this heading">¶</a></h2>
+<p>Lightweight background resource profiler.</p>
+<p>Logs CPU, RAM, and GPU stats to a CSV file at a configurable interval.
+Uses line-buffered I/O so data survives unexpected kills.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="src.profiler.ResourceProfiler">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.profiler.</span></span><span class="sig-name descname"><span class="pre">ResourceProfiler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">30</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/profiler.html#ResourceProfiler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.profiler.ResourceProfiler" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Background daemon that periodically writes resource stats to a CSV.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.profiler.ResourceProfiler.set_epoch">
+<span class="sig-name descname"><span class="pre">set_epoch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">epoch</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/profiler.html#ResourceProfiler.set_epoch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.profiler.ResourceProfiler.set_epoch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the current epoch number to log.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.profiler.ResourceProfiler.set_note">
+<span class="sig-name descname"><span class="pre">set_note</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">note</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/profiler.html#ResourceProfiler.set_note"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.profiler.ResourceProfiler.set_note" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set a note to be logged with the next sample.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.profiler.ResourceProfiler.start">
+<span class="sig-name descname"><span class="pre">start</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/profiler.html#ResourceProfiler.start"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.profiler.ResourceProfiler.start" title="Permalink to this definition">¶</a></dt>
+<dd><p>Start the profiler thread and open the CSV file.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.profiler.ResourceProfiler.stop">
+<span class="sig-name descname"><span class="pre">stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/profiler.html#ResourceProfiler.stop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.profiler.ResourceProfiler.stop" title="Permalink to this definition">¶</a></dt>
+<dd><p>Stop the profiler thread and close the CSV file.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-src.test_full_grid">
+<span id="src-test-full-grid-module"></span><h2>src.test_full_grid module<a class="headerlink" href="#module-src.test_full_grid" title="Permalink to this heading">¶</a></h2>
+<p>Test script for the full grid tensor conversion and related processing functions.
+This script creates a simple dataset with a single void, runs the full grid tensor conversion,
+and prints the resulting tensor summary and predicted voids after clustering.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="src.test_full_grid.test_voids_to_target_functions">
+<span class="sig-prename descclassname"><span class="pre">src.test_full_grid.</span></span><span class="sig-name descname"><span class="pre">test_voids_to_target_functions</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/test_full_grid.html#test_voids_to_target_functions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.test_full_grid.test_voids_to_target_functions" title="Permalink to this definition">¶</a></dt>
+<dd><p>Test function for voids_to_target_full_grid and related processing functions.</p>
+</dd></dl>
+
+</section>
+<section id="module-src.train">
+<span id="src-train-module"></span><h2>src.train module<a class="headerlink" href="#module-src.train" title="Permalink to this heading">¶</a></h2>
+<p>Training code for the cosmic void 3D detector.</p>
+<dl class="simple">
+<dt>Refactored into composable functions:</dt><dd><p>process_head  → single head, single sample
+process_sample → all heads for one sample
+process_batch  → forward + loss for one batch
+run_epoch      → full train or val epoch
+train_detector → outer training loop</p>
+</dd>
+<dt>Plus:</dt><dd><p>TrainingConfig   → all hyperparameters in one place
+ModelCheckpointer → save/load logic</p>
+</dd>
+</dl>
+<dl class="py class">
+<dt class="sig sig-object py" id="src.train.ModelCheckpointer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.train.</span></span><span class="sig-name descname"><span class="pre">ModelCheckpointer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out_folder</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exp_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train.html#ModelCheckpointer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train.ModelCheckpointer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Handles saving, loading, and best-model tracking.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train.ModelCheckpointer.find_latest_experiment">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">find_latest_experiment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out_folder</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train.html#ModelCheckpointer.find_latest_experiment"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train.ModelCheckpointer.find_latest_experiment" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the most recent experiment folder name, or None.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train.ModelCheckpointer.load_or_init">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">load_or_init</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">out_folder</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_exp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'auto'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train.html#ModelCheckpointer.load_or_init"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train.ModelCheckpointer.load_or_init" title="Permalink to this definition">¶</a></dt>
+<dd><p>Try full load → partial load (strict=False) → fresh init.
+If last_exp=”auto”, picks the latest folder containing Best_model.pth.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train.ModelCheckpointer.save_if_best">
+<span class="sig-name descname"><span class="pre">save_if_best</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loss</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train.html#ModelCheckpointer.save_if_best"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train.ModelCheckpointer.save_if_best" title="Permalink to this definition">¶</a></dt>
+<dd><p>Save the model if the given loss is better than the best seen so far.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train.ModelCheckpointer.save_last">
+<span class="sig-name descname"><span class="pre">save_last</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train.html#ModelCheckpointer.save_last"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train.ModelCheckpointer.save_last" title="Permalink to this definition">¶</a></dt>
+<dd><p>Save the last model state (overwrites every epoch).</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="src.train.TrainingConfig">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.train.</span></span><span class="sig-name descname"><span class="pre">TrainingConfig</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5e-05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epochs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_decay</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hwem</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_anchors</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cube_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">125.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train.html#TrainingConfig"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train.TrainingConfig" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Holds all training hyper-parameters in one place.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.train.TrainingConfig.batch_size">
+<span class="sig-name descname"><span class="pre">batch_size</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#src.train.TrainingConfig.batch_size" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.train.TrainingConfig.cube_size">
+<span class="sig-name descname"><span class="pre">cube_size</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">125.0</span></em><a class="headerlink" href="#src.train.TrainingConfig.cube_size" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.train.TrainingConfig.epochs">
+<span class="sig-name descname"><span class="pre">epochs</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">10</span></em><a class="headerlink" href="#src.train.TrainingConfig.epochs" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.train.TrainingConfig.hwem">
+<span class="sig-name descname"><span class="pre">hwem</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2</span></em><a class="headerlink" href="#src.train.TrainingConfig.hwem" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.train.TrainingConfig.lr">
+<span class="sig-name descname"><span class="pre">lr</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">5e-05</span></em><a class="headerlink" href="#src.train.TrainingConfig.lr" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.train.TrainingConfig.n_anchors">
+<span class="sig-name descname"><span class="pre">n_anchors</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">3</span></em><a class="headerlink" href="#src.train.TrainingConfig.n_anchors" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="src.train.TrainingConfig.weight_decay">
+<span class="sig-name descname"><span class="pre">weight_decay</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.01</span></em><a class="headerlink" href="#src.train.TrainingConfig.weight_decay" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.train.backward_step">
+<span class="sig-prename descclassname"><span class="pre">src.train.</span></span><span class="sig-name descname"><span class="pre">backward_step</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">total_loss</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gscaler</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train.html#backward_step"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train.backward_step" title="Permalink to this definition">¶</a></dt>
+<dd><p>Back-propagation with mixed-precision scaling and gradient clipping.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.train.decode_and_fuse">
+<span class="sig-prename descclassname"><span class="pre">src.train.</span></span><span class="sig-name descname"><span class="pre">decode_and_fuse</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_meta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">box_fuser</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train.html#decode_and_fuse"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train.decode_and_fuse" title="Permalink to this definition">¶</a></dt>
+<dd><p>Decode all anchors from a raw tensor, apply WBF and overlap filtering.</p>
+<p>Works identically for both predictions and targets.</p>
+<p>Returns a filtered DataFrame of decoded voids.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.train.export_onnx">
+<span class="sig-prename descclassname"><span class="pre">src.train.</span></span><span class="sig-name descname"><span class="pre">export_onnx</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exp_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train.html#export_onnx"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train.export_onnx" title="Permalink to this definition">¶</a></dt>
+<dd><p>Optional ONNX export (kept separate from training).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.train.process_batch">
+<span class="sig-prename descclassname"><span class="pre">src.train.</span></span><span class="sig-name descname"><span class="pre">process_batch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loss_fn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">box_fuser</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logger</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train.html#process_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train.process_batch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Forward pass + per-sample loss accumulation for one batch.</p>
+<p>Returns the total (weighted) loss tensor.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.train.process_head">
+<span class="sig-prename descclassname"><span class="pre">src.train.</span></span><span class="sig-name descname"><span class="pre">process_head</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pred</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_meta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">box_fuser</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loss_fn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train.html#process_head"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train.process_head" title="Permalink to this definition">¶</a></dt>
+<dd><p>Evaluate a single detection head for one sample.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p><strong>head_loss</strong> (<em>Tensor | None</em>) – Scalar loss on GPU (None when no ground-truth voids exist).</p></li>
+<li><p><strong>metrics</strong> (<em>dict</em>) – All metrics needed by the logger.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.train.process_sample">
+<span class="sig-prename descclassname"><span class="pre">src.train.</span></span><span class="sig-name descname"><span class="pre">process_sample</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">preds</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">targets_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">box_fuser</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loss_fn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logger</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train.html#process_sample"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train.process_sample" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate over all heads for one sample inside a batch.</p>
+<p>Returns the accumulated (weighted) loss across heads.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.train.run_epoch">
+<span class="sig-prename descclassname"><span class="pre">src.train.</span></span><span class="sig-name descname"><span class="pre">run_epoch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">epoch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loss_fn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gscaler</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">box_fuser</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logger</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">checkpointer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train.html#run_epoch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train.run_epoch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Execute one full epoch (train or validation).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.train.start_all">
+<span class="sig-prename descclassname"><span class="pre">src.train.</span></span><span class="sig-name descname"><span class="pre">start_all</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">exp_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'voids_3d_detection'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train.html#start_all"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train.start_all" title="Permalink to this definition">¶</a></dt>
+<dd><p>Main entry point to start training.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.train.train_detector">
+<span class="sig-prename descclassname"><span class="pre">src.train.</span></span><span class="sig-name descname"><span class="pre">train_detector</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">train_loader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">valid_loader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exp_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'train_detector'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train.html#train_detector"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train.train_detector" title="Permalink to this definition">¶</a></dt>
+<dd><p>Main training loop.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> – network to train</p></li>
+<li><p><strong>train_loader</strong> – training DataLoader</p></li>
+<li><p><strong>valid_loader</strong> – validation DataLoader</p></li>
+<li><p><strong>config</strong> – TrainingConfig with all hyper-parameters</p></li>
+<li><p><strong>exp_name</strong> – experiment name (used for logging / checkpoints)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.train.wbf">
+<span class="sig-prename descclassname"><span class="pre">src.train.</span></span><span class="sig-name descname"><span class="pre">wbf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid_s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">box_fuser</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cube_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">125.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train.html#wbf"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train.wbf" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply Weighted Box Fusion to a DataFrame of voids.</p>
+</dd></dl>
+
+</section>
+<section id="module-src.train_logger">
+<span id="src-train-logger-module"></span><h2>src.train_logger module<a class="headerlink" href="#module-src.train_logger" title="Permalink to this heading">¶</a></h2>
+<p>this module aims to handle all the logging of the metrics
+and the plot of the training curves for the project</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="src.train_logger.AverageValueMeter">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.train_logger.</span></span><span class="sig-name descname"><span class="pre">AverageValueMeter</span></span><a class="reference internal" href="_modules/src/train_logger.html#AverageValueMeter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train_logger.AverageValueMeter" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Meter to keep track of average values during training,
+such as losses and metrics.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train_logger.AverageValueMeter.add">
+<span class="sig-name descname"><span class="pre">add</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train_logger.html#AverageValueMeter.add"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train_logger.AverageValueMeter.add" title="Permalink to this definition">¶</a></dt>
+<dd><p>Add a new value to the meter.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train_logger.AverageValueMeter.reset">
+<span class="sig-name descname"><span class="pre">reset</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train_logger.html#AverageValueMeter.reset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train_logger.AverageValueMeter.reset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reset the meter to initial state.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train_logger.AverageValueMeter.value">
+<span class="sig-name descname"><span class="pre">value</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train_logger.html#AverageValueMeter.value"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train_logger.AverageValueMeter.value" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the average and current value.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="src.train_logger.TrainingLogger">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.train_logger.</span></span><span class="sig-name descname"><span class="pre">TrainingLogger</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">exp_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_heads</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_samples</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">16</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train_logger.html#TrainingLogger"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train_logger.TrainingLogger" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>This class handles all the log of the metrics during the training</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train_logger.TrainingLogger.all_keys">
+<span class="sig-name descname"><span class="pre">all_keys</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train_logger.html#TrainingLogger.all_keys"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train_logger.TrainingLogger.all_keys" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns: all the metric keys short description</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train_logger.TrainingLogger.all_titles">
+<span class="sig-name descname"><span class="pre">all_titles</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train_logger.html#TrainingLogger.all_titles"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train_logger.TrainingLogger.all_titles" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns: all the metric extended description</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train_logger.TrainingLogger.det_update">
+<span class="sig-name descname"><span class="pre">det_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">head</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train_logger.html#TrainingLogger.det_update"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train_logger.TrainingLogger.det_update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates a single value in the matrix of a specific metric
+:param key: the metric to update
+:param head: the head where is measured
+:param sample_id: the id of the sample where is measured
+:param value: the value of the metric</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train_logger.TrainingLogger.get_meter">
+<span class="sig-name descname"><span class="pre">get_meter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train_logger.html#TrainingLogger.get_meter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train_logger.TrainingLogger.get_meter" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the meter for a specific metric</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train_logger.TrainingLogger.log">
+<span class="sig-name descname"><span class="pre">log</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">epoch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train_logger.html#TrainingLogger.log"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train_logger.TrainingLogger.log" title="Permalink to this definition">¶</a></dt>
+<dd><p>Log e crea grafici per l’epoca corrente</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train_logger.TrainingLogger.log_plt">
+<span class="sig-name descname"><span class="pre">log_plt</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mode</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train_logger.html#TrainingLogger.log_plt"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train_logger.TrainingLogger.log_plt" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates the global averages of the metrics and passes them to the plotter
+:param mode: “train” or “val”</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train_logger.TrainingLogger.print_all">
+<span class="sig-name descname"><span class="pre">print_all</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">epoch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train_logger.html#TrainingLogger.print_all"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train_logger.TrainingLogger.print_all" title="Permalink to this definition">¶</a></dt>
+<dd><p>Prints all the metrics
+:param epoch: epoch number
+:param mode: “train” or “val”</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train_logger.TrainingLogger.reset">
+<span class="sig-name descname"><span class="pre">reset</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train_logger.html#TrainingLogger.reset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train_logger.TrainingLogger.reset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Resets the logger</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train_logger.TrainingLogger.save_plots">
+<span class="sig-name descname"><span class="pre">save_plots</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train_logger.html#TrainingLogger.save_plots"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train_logger.TrainingLogger.save_plots" title="Permalink to this definition">¶</a></dt>
+<dd><p>Saves the training graphs</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train_logger.TrainingLogger.save_txt">
+<span class="sig-name descname"><span class="pre">save_txt</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train_logger.html#TrainingLogger.save_txt"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train_logger.TrainingLogger.save_txt" title="Permalink to this definition">¶</a></dt>
+<dd><p>Salva un riepilogo finale</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train_logger.TrainingLogger.update">
+<span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train_logger.html#TrainingLogger.update"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train_logger.TrainingLogger.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates the global average of a specific metric based on the detailed values
+Args:            key: the metric to update</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.train_logger.TrainingLogger.update_all">
+<span class="sig-name descname"><span class="pre">update_all</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/train_logger.html#TrainingLogger.update_all"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.train_logger.TrainingLogger.update_all" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates all the global averages of the metrics
+based on the detailed values</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-src">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-src" title="Permalink to this heading">¶</a></h2>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">DeepCosmoNet Voids</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2026, Vincenzo Del Zoppo.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 5.3.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+      |
+      <a href="_sources/src.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,362 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>src.losses &#8212; DeepCosmoNet Voids 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css" />
+    <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for src.losses</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">This module contains the definition of the loss function</span>
+<span class="sd">and main detection metrics for the yolo network with multi-anchor support</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">nn</span>
+<span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="nn">func</span>
+
+<span class="c1"># Head weight exponential multiplier</span>
+<span class="c1"># used in focal loss calculations</span>
+<span class="n">hwem</span> <span class="o">=</span> <span class="mi">4</span>
+
+
+<div class="viewcode-block" id="YOLO3DLoss"><a class="viewcode-back" href="../../src.html#src.losses.YOLO3DLoss">[docs]</a><span class="k">class</span> <span class="nc">YOLO3DLoss</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This class handles the hyperparameter of a Yolo-like loss function</span>
+<span class="sd">    with multi-anchor support (3 anchors per detection head)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">objectness_weight</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">coordinate_weight</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">radius_weight</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">focal_alpha</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">focal_gamma</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="n">num_anchors</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Loss function per YOLO 3D with multi-anchor support</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            objectness_weight: weight for objectness loss</span>
+<span class="sd">            coordinate_weight: weight for the center coordinate loss (x, y, z)</span>
+<span class="sd">            radius_weight: weight for the radius loss</span>
+<span class="sd">            focal_alpha: alpha parameter for focal loss (weight for positive class)</span>
+<span class="sd">            focal_gamma: gamma parameter for focal loss (focusing parameter)</span>
+<span class="sd">            num_anchors: number of anchors per head (default: 3)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">objectness_weight</span> <span class="o">=</span> <span class="n">objectness_weight</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">coordinate_weight</span> <span class="o">=</span> <span class="n">coordinate_weight</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">radius_weight</span> <span class="o">=</span> <span class="n">radius_weight</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">focal_alpha</span> <span class="o">=</span> <span class="n">focal_alpha</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">focal_gamma</span> <span class="o">=</span> <span class="n">focal_gamma</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_anchors</span> <span class="o">=</span> <span class="n">num_anchors</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">channels_per_anchor</span> <span class="o">=</span> <span class="mi">5</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">uncertainty_loss</span> <span class="o">=</span> <span class="n">UncertaintyLoss</span><span class="p">(</span><span class="n">num_lambdas</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">smoothl</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">MSELoss</span><span class="p">(</span><span class="n">reduction</span><span class="o">=</span><span class="s2">&quot;none&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="YOLO3DLoss.focal_loss"><a class="viewcode-back" href="../../src.html#src.losses.YOLO3DLoss.focal_loss">[docs]</a>    <span class="k">def</span> <span class="nf">focal_loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pred</span><span class="p">,</span> <span class="n">target</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Focal Loss for objectness detection with automatic handling of logits/probabilities.</span>
+
+<span class="sd">        Implements the formula: FL(p_t) = -alpha_t * (1 - p_t)^gamma * CE(pred, target)</span>
+<span class="sd">        where alpha_t is applied only to the positive class to encourage detection.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - pred: torch.Tensor, shape (grid, grid, grid), predictions</span>
+<span class="sd">        - If logits: unbounded values</span>
+<span class="sd">        - If probabilities: values in [0,1]</span>
+<span class="sd">        - target: torch.Tensor, shape (grid, grid, grid), ground truth binary values (0 or 1)</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - torch.Tensor: normalized scalar focal loss value</span>
+
+<span class="sd">        Note:</span>
+<span class="sd">        - focal_alpha &gt; 1: pushes model towards detection (more weight to positive class)</span>
+<span class="sd">        - focal_gamma &gt; 0: reduces weight of easy examples, focuses on hard ones</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">ce_loss</span> <span class="o">=</span> <span class="n">func</span><span class="o">.</span><span class="n">binary_cross_entropy_with_logits</span><span class="p">(</span><span class="n">pred</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">reduction</span><span class="o">=</span><span class="s2">&quot;none&quot;</span><span class="p">)</span>
+        <span class="n">pred_prob</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sigmoid</span><span class="p">(</span><span class="n">pred</span><span class="p">)</span>
+
+        <span class="c1"># Calculate p_t (correct probability for each sample)</span>
+        <span class="n">p_t</span> <span class="o">=</span> <span class="n">pred_prob</span> <span class="o">*</span> <span class="n">target</span> <span class="o">+</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">pred_prob</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">target</span><span class="p">)</span>
+
+        <span class="c1"># Calculate alpha_t: higher weight for positive class (detection)</span>
+        <span class="n">alpha_t</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">target</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">focal_alpha</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+
+        <span class="c1"># Calculate focal weight: (1 - p_t)^gamma reduces weight of easy examples</span>
+        <span class="n">focal_weight</span> <span class="o">=</span> <span class="n">alpha_t</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p_t</span><span class="p">)</span><span class="o">.</span><span class="n">pow</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">focal_gamma</span><span class="p">)</span>
+
+        <span class="c1"># Apply focal loss</span>
+        <span class="n">focal_loss</span> <span class="o">=</span> <span class="n">focal_weight</span> <span class="o">*</span> <span class="n">ce_loss</span>
+
+        <span class="c1"># Separate positive and negative samples</span>
+        <span class="n">pos_mask</span> <span class="o">=</span> <span class="n">target</span> <span class="o">&gt;</span> <span class="mf">0.5</span>
+        <span class="n">neg_mask</span> <span class="o">=</span> <span class="n">target</span> <span class="o">&lt;=</span> <span class="mf">0.5</span>
+
+        <span class="c1"># Balanced sampling: equal weight to pos and neg</span>
+        <span class="k">if</span> <span class="n">pos_mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">neg_mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">pos_loss</span> <span class="o">=</span> <span class="n">focal_loss</span><span class="p">[</span><span class="n">pos_mask</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+            <span class="c1"># Hard negative mining: keep only hardest negatives</span>
+            <span class="n">neg_losses</span> <span class="o">=</span> <span class="n">focal_loss</span><span class="p">[</span><span class="n">neg_mask</span><span class="p">]</span>
+            <span class="n">num_hard_negs</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
+                <span class="n">pos_mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span> <span class="o">*</span> <span class="mi">3</span><span class="p">,</span> <span class="n">neg_mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+            <span class="p">)</span>  <span class="c1"># 3:1 ratio</span>
+            <span class="n">num_hard_negs</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">num_hard_negs</span><span class="p">,</span> <span class="n">neg_losses</span><span class="o">.</span><span class="n">numel</span><span class="p">())</span>
+            <span class="n">hard_neg_losses</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">topk</span><span class="p">(</span><span class="n">neg_losses</span><span class="p">,</span> <span class="n">num_hard_negs</span><span class="p">)</span>
+            <span class="n">neg_loss</span> <span class="o">=</span> <span class="n">hard_neg_losses</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+
+            <span class="k">return</span> <span class="p">(</span><span class="n">pos_loss</span> <span class="o">+</span> <span class="n">neg_loss</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+
+        <span class="k">return</span> <span class="n">focal_loss</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="YOLO3DLoss.compute_single_anchor_loss"><a class="viewcode-back" href="../../src.html#src.losses.YOLO3DLoss.compute_single_anchor_loss">[docs]</a>    <span class="k">def</span> <span class="nf">compute_single_anchor_loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pred_anchor</span><span class="p">,</span> <span class="n">target_anchor</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Computes the loss for a single anchor.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - pred_anchor: torch.Tensor, shape (5, grid_size, grid_size, grid_size)</span>
+<span class="sd">        - target_anchor: torch.Tensor, shape (5, grid_size, grid_size, grid_size)</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - dict: dictionary with losses for this anchor</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">device</span> <span class="o">=</span> <span class="n">pred_anchor</span><span class="o">.</span><span class="n">device</span>
+
+        <span class="n">pred_objectness</span> <span class="o">=</span> <span class="n">pred_anchor</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># (grid, grid, grid)</span>
+        <span class="n">pred_x</span> <span class="o">=</span> <span class="n">pred_anchor</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">pred_y</span> <span class="o">=</span> <span class="n">pred_anchor</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+        <span class="n">pred_z</span> <span class="o">=</span> <span class="n">pred_anchor</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+        <span class="n">pred_radius</span> <span class="o">=</span> <span class="n">pred_anchor</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span>
+
+        <span class="n">target_objectness</span> <span class="o">=</span> <span class="n">target_anchor</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">target_x</span> <span class="o">=</span> <span class="n">target_anchor</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">target_y</span> <span class="o">=</span> <span class="n">target_anchor</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+        <span class="n">target_z</span> <span class="o">=</span> <span class="n">target_anchor</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+        <span class="n">target_radius</span> <span class="o">=</span> <span class="n">target_anchor</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span>
+
+        <span class="n">obj_mask</span> <span class="o">=</span> <span class="n">target_objectness</span> <span class="o">&gt;</span> <span class="mf">0.0</span>
+        <span class="n">num_pos</span> <span class="o">=</span> <span class="n">obj_mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+
+        <span class="c1"># Calculate objectness loss with focal loss</span>
+        <span class="n">objectness_loss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">focal_loss</span><span class="p">(</span><span class="n">pred_objectness</span><span class="p">,</span> <span class="n">target_objectness</span><span class="p">)</span>
+
+        <span class="c1"># Calculate coordinate loss only for positive cells</span>
+        <span class="k">if</span> <span class="n">num_pos</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">coord_loss_x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">smoothl</span><span class="p">(</span><span class="n">pred_x</span> <span class="o">*</span> <span class="n">obj_mask</span><span class="p">,</span> <span class="n">target_x</span> <span class="o">*</span> <span class="n">obj_mask</span><span class="p">)</span>
+            <span class="n">coord_loss_y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">smoothl</span><span class="p">(</span><span class="n">pred_y</span> <span class="o">*</span> <span class="n">obj_mask</span><span class="p">,</span> <span class="n">target_y</span> <span class="o">*</span> <span class="n">obj_mask</span><span class="p">)</span>
+            <span class="n">coord_loss_z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">smoothl</span><span class="p">(</span><span class="n">pred_z</span> <span class="o">*</span> <span class="n">obj_mask</span><span class="p">,</span> <span class="n">target_z</span> <span class="o">*</span> <span class="n">obj_mask</span><span class="p">)</span>
+
+            <span class="n">coordinate_loss</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">coord_loss_x</span><span class="p">[</span><span class="n">obj_mask</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+                <span class="o">+</span> <span class="n">coord_loss_y</span><span class="p">[</span><span class="n">obj_mask</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+                <span class="o">+</span> <span class="n">coord_loss_z</span><span class="p">[</span><span class="n">obj_mask</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">coordinate_loss</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+
+        <span class="c1"># Calculate radius loss only for positive cells</span>
+        <span class="k">if</span> <span class="n">num_pos</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">radius_loss_tensor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">smoothl</span><span class="p">(</span>
+                <span class="n">pred_radius</span> <span class="o">*</span> <span class="n">obj_mask</span><span class="p">,</span> <span class="n">target_radius</span> <span class="o">*</span> <span class="n">obj_mask</span>
+            <span class="p">)</span>
+            <span class="n">radius_loss</span> <span class="o">=</span> <span class="n">radius_loss_tensor</span><span class="p">[</span><span class="n">obj_mask</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">radius_loss</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;objectness_loss&quot;</span><span class="p">:</span> <span class="n">objectness_loss</span><span class="p">,</span>
+            <span class="s2">&quot;coordinate_loss&quot;</span><span class="p">:</span> <span class="n">coordinate_loss</span><span class="p">,</span>
+            <span class="s2">&quot;radius_loss&quot;</span><span class="p">:</span> <span class="n">radius_loss</span><span class="p">,</span>
+            <span class="s2">&quot;num_pos&quot;</span><span class="p">:</span> <span class="n">num_pos</span><span class="p">,</span>
+        <span class="p">}</span></div>
+
+<div class="viewcode-block" id="YOLO3DLoss.forward"><a class="viewcode-back" href="../../src.html#src.losses.YOLO3DLoss.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pred</span><span class="p">,</span> <span class="n">target</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Computes the loss for multi-anchor predictions.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - pred: torch.Tensor, shape (15, grid_size, grid_size, grid_size) for 3 anchors</span>
+<span class="sd">        or (5, grid_size, grid_size, grid_size) for backward compatibility</span>
+<span class="sd">        - target: torch.Tensor, same shape as pred</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - dict: dictionary with combined losses compatible with train.py</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">device</span> <span class="o">=</span> <span class="n">pred</span><span class="o">.</span><span class="n">device</span>
+
+        <span class="c1"># Multi-anchor mode: loop over anchors</span>
+        <span class="n">total_objectness_loss</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">total_coordinate_loss</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">total_radius_loss</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">total_num_pos</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">for</span> <span class="n">anchor_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_anchors</span><span class="p">):</span>
+            <span class="c1"># Extract channels for this anchor</span>
+            <span class="n">start_ch</span> <span class="o">=</span> <span class="n">anchor_idx</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">channels_per_anchor</span>
+            <span class="n">end_ch</span> <span class="o">=</span> <span class="n">start_ch</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">channels_per_anchor</span>
+
+            <span class="n">pred_anchor</span> <span class="o">=</span> <span class="n">pred</span><span class="p">[</span><span class="n">start_ch</span><span class="p">:</span><span class="n">end_ch</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>  <span class="c1"># (5, H, W, D)</span>
+            <span class="n">target_anchor</span> <span class="o">=</span> <span class="n">target</span><span class="p">[</span><span class="n">start_ch</span><span class="p">:</span><span class="n">end_ch</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>  <span class="c1"># (5, H, W, D)</span>
+
+            <span class="c1"># Compute loss for this anchor</span>
+            <span class="n">anchor_losses</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_single_anchor_loss</span><span class="p">(</span><span class="n">pred_anchor</span><span class="p">,</span> <span class="n">target_anchor</span><span class="p">)</span>
+
+            <span class="c1"># Accumulate</span>
+            <span class="n">total_objectness_loss</span> <span class="o">+=</span> <span class="n">anchor_losses</span><span class="p">[</span><span class="s2">&quot;objectness_loss&quot;</span><span class="p">]</span>
+            <span class="n">total_coordinate_loss</span> <span class="o">+=</span> <span class="n">anchor_losses</span><span class="p">[</span><span class="s2">&quot;coordinate_loss&quot;</span><span class="p">]</span>
+            <span class="n">total_radius_loss</span> <span class="o">+=</span> <span class="n">anchor_losses</span><span class="p">[</span><span class="s2">&quot;radius_loss&quot;</span><span class="p">]</span>
+            <span class="n">total_num_pos</span> <span class="o">+=</span> <span class="n">anchor_losses</span><span class="p">[</span><span class="s2">&quot;num_pos&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+
+        <span class="c1"># Average over anchors</span>
+        <span class="n">objectness_loss</span> <span class="o">=</span> <span class="n">total_objectness_loss</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_anchors</span>
+        <span class="n">coordinate_loss</span> <span class="o">=</span> <span class="n">total_coordinate_loss</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_anchors</span>
+        <span class="n">radius_loss</span> <span class="o">=</span> <span class="n">total_radius_loss</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_anchors</span>
+
+        <span class="c1"># Combine with uncertainty weighting</span>
+        <span class="n">total_loss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">uncertainty_loss</span><span class="p">(</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">objectness_loss</span><span class="p">,</span> <span class="n">coordinate_loss</span><span class="p">,</span> <span class="n">radius_loss</span><span class="p">])</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;total_loss&quot;</span><span class="p">:</span> <span class="n">total_loss</span><span class="p">,</span>
+            <span class="s2">&quot;objectness_loss&quot;</span><span class="p">:</span> <span class="n">objectness_loss</span><span class="p">,</span>  <span class="c1"># Unweighted loss for monitoring</span>
+            <span class="s2">&quot;coordinate_loss&quot;</span><span class="p">:</span> <span class="n">coordinate_loss</span><span class="p">,</span>  <span class="c1"># Unweighted loss for monitoring</span>
+            <span class="s2">&quot;radius_loss&quot;</span><span class="p">:</span> <span class="n">radius_loss</span><span class="p">,</span>  <span class="c1"># Unweighted loss for monitoring</span>
+            <span class="s2">&quot;weighted_objectness_loss&quot;</span><span class="p">:</span> <span class="n">objectness_loss</span><span class="p">,</span>  <span class="c1"># Weighted loss</span>
+            <span class="s2">&quot;weighted_coordinate_loss&quot;</span><span class="p">:</span> <span class="n">coordinate_loss</span><span class="p">,</span>  <span class="c1"># Weighted loss</span>
+            <span class="s2">&quot;weighted_radius_loss&quot;</span><span class="p">:</span> <span class="n">radius_loss</span><span class="p">,</span>  <span class="c1"># Weighted loss</span>
+            <span class="s2">&quot;num_positive_cells&quot;</span><span class="p">:</span> <span class="n">total_num_pos</span><span class="p">,</span>  <span class="c1"># For monitoring</span>
+        <span class="p">}</span></div></div>
+
+
+<div class="viewcode-block" id="UncertaintyLoss"><a class="viewcode-back" href="../../src.html#src.losses.UncertaintyLoss">[docs]</a><span class="k">class</span> <span class="nc">UncertaintyLoss</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Automatic loss weighting using learned uncertainty.</span>
+
+<span class="sd">    Learns optimal weights for multiple loss components by treating</span>
+<span class="sd">    task uncertainty as learnable parameters.</span>
+
+<span class="sd">    Reference: &quot;Multi-Task Learning Using Uncertainty to Weigh Losses</span>
+<span class="sd">    for Scene Geometry and Semantics&quot; (Kendall et al., 2018)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_lambdas</span><span class="o">=</span><span class="mi">3</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log_vars</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_lambdas</span><span class="p">))</span>
+
+<div class="viewcode-block" id="UncertaintyLoss.forward"><a class="viewcode-back" href="../../src.html#src.losses.UncertaintyLoss.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">losses</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parameters:</span>
+<span class="sd">        - losses: torch.Tensor of shape (num_lambdas,) containing individual losses</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - torch.Tensor: scalar combined loss</span>
+
+<span class="sd">        Formula: L_total = Σ(1/(2sigma²) * L_i + log(sigma))</span>
+<span class="sd">        where σ² = exp(log_var)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Convert log-variance to precision (1/σ²)</span>
+        <span class="n">precision</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">log_vars</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">losses</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+        <span class="c1"># Apply uncertainty weighting</span>
+        <span class="c1"># precision * loss: weight inversely proportional to uncertainty</span>
+        <span class="c1"># log_vars: regularization term (prevents σ → ∞)</span>
+        <span class="n">weighted_losses</span> <span class="o">=</span> <span class="n">precision</span> <span class="o">*</span> <span class="n">losses</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_vars</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">losses</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">weighted_losses</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span></div></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">DeepCosmoNet Voids</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2026, Vincenzo Del Zoppo.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 5.3.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

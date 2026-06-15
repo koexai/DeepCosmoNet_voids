@@ -1,0 +1,423 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>src.dataset &#8212; DeepCosmoNet Voids 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css" />
+    <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for src.dataset</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">This module aims to format the data at the input and output of the network</span>
+<span class="sd">with multi-anchor support and sliding window on radius subsets.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">glob</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">torch.utils.data.dataset</span> <span class="kn">import</span> <span class="n">Dataset</span>
+<span class="kn">from</span> <span class="nn">torch.utils.data</span> <span class="kn">import</span> <span class="n">DataLoader</span>
+
+<span class="kn">from</span> <span class="nn">src.dcn_config</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">get_dataset_paths</span><span class="p">,</span>
+    <span class="n">PREFIX</span><span class="p">,</span>
+    <span class="n">CUBESIZE</span><span class="p">,</span>
+    <span class="n">NUM_HEADS</span><span class="p">,</span>
+    <span class="n">NUM_ANCHORS</span><span class="p">,</span>
+    <span class="n">SUBSETS_PER_ANCHOR</span><span class="p">,</span>
+    <span class="n">ANCHOR_MULTIPLIERS</span><span class="p">,</span>
+    <span class="n">N_BINS</span><span class="p">,</span>
+    <span class="n">SCALE_ADJ</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">src.augmentation</span> <span class="kn">import</span> <span class="n">random_flip</span><span class="p">,</span> <span class="n">random_permute</span>
+<span class="kn">from</span> <span class="nn">src.features</span> <span class="kn">import</span> <span class="n">prepare_void_detection_input</span>
+<span class="kn">from</span> <span class="nn">src.full_grid_tensor</span> <span class="kn">import</span> <span class="n">voids_to_target_full_grid</span><span class="p">,</span> <span class="n">BoxClusterer</span><span class="p">,</span> <span class="n">group_means</span>
+
+
+<div class="viewcode-block" id="sort_voids_by_radius"><a class="viewcode-back" href="../../src.html#src.dataset.sort_voids_by_radius">[docs]</a><span class="k">def</span> <span class="nf">sort_voids_by_radius</span><span class="p">(</span><span class="n">voids</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Sorts voids from a dataframe into subsets based on radius bins.</span>
+<span class="sd">    Uses a fine-grained logarithmic scale for sliding window anchor assignment.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pandas Dataframe: voids with columns &#39;x&#39;, &#39;y&#39;, &#39;z&#39;, &#39;radius&#39;</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list of Dataframes: voids subsets sorted by radius in descending order</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">n_subsets</span> <span class="o">=</span> <span class="n">N_BINS</span> <span class="o">+</span> <span class="n">SUBSETS_PER_ANCHOR</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="n">limits</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="mf">1.95</span>
+        <span class="o">*</span> <span class="p">(</span><span class="mi">2</span> <span class="o">**</span> <span class="p">(</span><span class="mi">6</span> <span class="o">-</span> <span class="n">NUM_HEADS</span><span class="p">)</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">**</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_subsets</span><span class="p">)</span> <span class="o">/</span> <span class="n">NUM_ANCHORS</span><span class="p">))[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="p">)</span>
+
+    <span class="n">subsets</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">limits</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">min_r</span><span class="p">,</span> <span class="n">max_r</span> <span class="o">=</span> <span class="n">limits</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">],</span> <span class="n">limits</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="n">subset</span> <span class="o">=</span> <span class="n">voids</span><span class="p">[(</span><span class="n">voids</span><span class="p">[</span><span class="s2">&quot;radius&quot;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">min_r</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">voids</span><span class="p">[</span><span class="s2">&quot;radius&quot;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">max_r</span><span class="p">)]</span>
+        <span class="n">subsets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">subset</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">subsets</span></div>
+
+
+<div class="viewcode-block" id="target_to_voids"><a class="viewcode-back" href="../../src.html#src.dataset.target_to_voids">[docs]</a><span class="k">def</span> <span class="nf">target_to_voids</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">anchor</span><span class="p">,</span> <span class="n">o_x</span><span class="p">,</span> <span class="n">o_y</span><span class="p">,</span> <span class="n">o_z</span><span class="p">,</span> <span class="n">thresh</span><span class="o">=</span><span class="mf">0.0</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Opposite function of voids_to_targets.</span>
+<span class="sd">    Args:</span>
+<span class="sd">        tensor: Tensor of shape (B, 5, grid_size, grid_size, grid_size)</span>
+<span class="sd">        integers o_x, o_y, o_z: the offset of the cube in the universe</span>
+<span class="sd">        thresh: 0.5 if after sigmoid 0.0 if before sigmoid</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        pandas Dataframe: dataframe of voids &#39;x&#39;, &#39;y&#39;, &#39;z&#39;, &#39;radius&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># converts a list of lists to tensor if needed</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+        <span class="n">tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+    <span class="c1"># convert numpy array to tensor if needed</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+        <span class="n">tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">tensor</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+    <span class="c1"># make it work for batches or a single target</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+        <span class="n">tensor</span> <span class="o">=</span> <span class="n">tensor</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># Add batch dimension</span>
+    <span class="c1"># get voids above the threshold</span>
+    <span class="n">mask</span> <span class="o">=</span> <span class="n">tensor</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:,</span> <span class="p">:]</span> <span class="o">&gt;</span> <span class="n">thresh</span>
+    <span class="n">ids</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">mask</span><span class="p">)</span>
+
+    <span class="n">anchor_mult</span> <span class="o">=</span> <span class="n">ANCHOR_MULTIPLIERS</span><span class="p">[</span><span class="n">anchor</span><span class="p">]</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">mask</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="c1"># no object found</span>
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([]),</span>
+                <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([]),</span>
+                <span class="s2">&quot;z&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([]),</span>
+                <span class="s2">&quot;radius&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([]),</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+
+    <span class="c1"># get grid ids of voids</span>
+    <span class="n">x_ids</span> <span class="o">=</span> <span class="n">ids</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+    <span class="n">y_ids</span> <span class="o">=</span> <span class="n">ids</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+    <span class="n">z_ids</span> <span class="o">=</span> <span class="n">ids</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+
+    <span class="c1"># get offsets for detected voids</span>
+    <span class="n">x_off</span> <span class="o">=</span> <span class="n">tensor</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">x_ids</span><span class="p">,</span> <span class="n">y_ids</span><span class="p">,</span> <span class="n">z_ids</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+    <span class="n">y_off</span> <span class="o">=</span> <span class="n">tensor</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">x_ids</span><span class="p">,</span> <span class="n">y_ids</span><span class="p">,</span> <span class="n">z_ids</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+    <span class="n">z_off</span> <span class="o">=</span> <span class="n">tensor</span><span class="p">[:,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">x_ids</span><span class="p">,</span> <span class="n">y_ids</span><span class="p">,</span> <span class="n">z_ids</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+    <span class="n">r_off</span> <span class="o">=</span> <span class="n">tensor</span><span class="p">[:,</span> <span class="mi">4</span><span class="p">,</span> <span class="n">x_ids</span><span class="p">,</span> <span class="n">y_ids</span><span class="p">,</span> <span class="n">z_ids</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+
+    <span class="c1"># get scale</span>
+    <span class="n">grid_size</span> <span class="o">=</span> <span class="n">tensor</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">scale</span> <span class="o">=</span> <span class="n">grid_size</span> <span class="o">/</span> <span class="n">CUBESIZE</span>
+
+    <span class="c1"># add grid offset and voxel offset</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="p">(</span><span class="n">x_ids</span> <span class="o">+</span> <span class="n">x_off</span> <span class="o">*</span> <span class="n">SCALE_ADJ</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">+</span> <span class="n">o_x</span> <span class="o">*</span> <span class="n">grid_size</span><span class="p">)</span> <span class="o">/</span> <span class="n">scale</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="p">(</span><span class="n">y_ids</span> <span class="o">+</span> <span class="n">y_off</span> <span class="o">*</span> <span class="n">SCALE_ADJ</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">+</span> <span class="n">o_y</span> <span class="o">*</span> <span class="n">grid_size</span><span class="p">)</span> <span class="o">/</span> <span class="n">scale</span>
+    <span class="n">z</span> <span class="o">=</span> <span class="p">(</span><span class="n">z_ids</span> <span class="o">+</span> <span class="n">z_off</span> <span class="o">*</span> <span class="n">SCALE_ADJ</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">+</span> <span class="n">o_z</span> <span class="o">*</span> <span class="n">grid_size</span><span class="p">)</span> <span class="o">/</span> <span class="n">scale</span>
+
+    <span class="c1"># invert radius log scaled</span>
+    <span class="n">radius</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">r_off</span> <span class="o">-</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">/</span> <span class="n">scale</span><span class="p">)</span> <span class="o">*</span> <span class="n">SCALE_ADJ</span> <span class="o">*</span> <span class="n">anchor_mult</span>
+
+    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ravel</span><span class="p">(</span><span class="n">x</span><span class="p">),</span>
+            <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ravel</span><span class="p">(</span><span class="n">y</span><span class="p">),</span>
+            <span class="s2">&quot;z&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ravel</span><span class="p">(</span><span class="n">z</span><span class="p">),</span>
+            <span class="s2">&quot;radius&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ravel</span><span class="p">(</span><span class="n">radius</span><span class="p">),</span>
+        <span class="p">}</span>
+    <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="VoidDataset"><a class="viewcode-back" href="../../src.html#src.dataset.VoidDataset">[docs]</a><span class="k">class</span> <span class="nc">VoidDataset</span><span class="p">(</span><span class="n">Dataset</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Overrides the PyTorch DataSet Class specific for our use case</span>
+<span class="sd">    with multi-anchor support.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">particles_dir</span><span class="p">,</span> <span class="n">voids_dir</span><span class="p">,</span> <span class="n">augment</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">particles_dir</span> <span class="o">=</span> <span class="n">particles_dir</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">voids_dir</span> <span class="o">=</span> <span class="n">voids_dir</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resolution</span> <span class="o">=</span> <span class="mi">128</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cached_items</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">augment</span> <span class="o">=</span> <span class="n">augment</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">box_fuser</span> <span class="o">=</span> <span class="n">BoxClusterer</span><span class="p">()</span>
+
+        <span class="c1"># find particle files</span>
+        <span class="n">pattern</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">particles_dir</span><span class="p">,</span> <span class="n">PREFIX</span> <span class="o">+</span> <span class="s2">&quot;_*.parquet&quot;</span><span class="p">)</span>
+        <span class="n">particle_files</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">pattern</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">file_indices</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">file_path</span> <span class="ow">in</span> <span class="n">particle_files</span><span class="p">:</span>
+            <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+            <span class="c1"># match = re.search(PREFIX+r&#39;_(\d+_\d+_\d+)\.parquet&#39;, filename)</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span>
+                <span class="n">PREFIX</span> <span class="o">+</span> <span class="sa">r</span><span class="s2">&quot;_([0-9a-f]+_[0-9a-f]+_[0-9a-f]+)\.parquet&quot;</span><span class="p">,</span> <span class="n">filename</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">file_indices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Loaded&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">file_indices</span><span class="p">),</span> <span class="s2">&quot;files&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">file_indices</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">particles_dir</span><span class="p">))</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">voids_dir</span><span class="p">))</span>
+            <span class="n">exit</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Retrieves a sample from the dataset at the specified index.</span>
+
+<span class="sd">        Multi-anchor version: generates 15-channel targets for each of 3 heads.</span>
+<span class="sd">        Each head has 3 anchors, each anchor uses 3 consecutive radius subsets.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - index: int, index of the sample to retrieve</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - sample: a dataset sample with input and output tensors ready for the model</span>
+<span class="sd">            - input: (5, 128, 128, 128)</span>
+<span class="sd">            - targets: list of 3 tensors, shapes (15, 2, 2, 2), (15, 4, 4, 4), (15, 8, 8, 8)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">index</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cached_items</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cached_items</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+
+        <span class="n">file_index</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">file_indices</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+        <span class="n">particle_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">particles_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">PREFIX</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">file_index</span><span class="si">}</span><span class="s2">.parquet&quot;</span>
+        <span class="p">)</span>
+        <span class="n">void_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">voids_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;voids_</span><span class="si">{</span><span class="n">file_index</span><span class="si">}</span><span class="s2">.parquet&quot;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">particles_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_parquet</span><span class="p">(</span><span class="n">particle_file</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;fastparquet&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">FileNotFoundError</span> <span class="k">as</span> <span class="n">fnf</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;particle files not found: </span><span class="si">{</span><span class="n">particle_file</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span> <span class="kn">from</span> <span class="nn">fnf</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">voids_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_parquet</span><span class="p">(</span><span class="n">void_file</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;fastparquet&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">FileNotFoundError</span> <span class="k">as</span> <span class="n">fnf</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;voids file not found: </span><span class="si">{</span><span class="n">void_file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">fnf</span>
+
+        <span class="c1"># o_x, o_y, o_z = np.int32(file_index.split(&quot;_&quot;))</span>
+        <span class="n">o_x</span><span class="p">,</span> <span class="n">o_y</span><span class="p">,</span> <span class="n">o_z</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="mi">16</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">file_index</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)]</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">augment</span><span class="p">:</span>
+            <span class="n">voids_df</span><span class="p">,</span> <span class="n">particles_df</span><span class="p">,</span> <span class="n">o_x</span><span class="p">,</span> <span class="n">o_y</span><span class="p">,</span> <span class="n">o_z</span> <span class="o">=</span> <span class="n">random_permute</span><span class="p">(</span>
+                <span class="n">voids_df</span><span class="p">,</span> <span class="n">particles_df</span><span class="p">,</span> <span class="n">o_x</span><span class="p">,</span> <span class="n">o_y</span><span class="p">,</span> <span class="n">o_z</span>
+            <span class="p">)</span>
+            <span class="n">voids_df</span><span class="p">,</span> <span class="n">particles_df</span><span class="p">,</span> <span class="n">o_x</span><span class="p">,</span> <span class="n">o_y</span><span class="p">,</span> <span class="n">o_z</span> <span class="o">=</span> <span class="n">random_flip</span><span class="p">(</span>
+                <span class="n">voids_df</span><span class="p">,</span> <span class="n">particles_df</span><span class="p">,</span> <span class="n">o_x</span><span class="p">,</span> <span class="n">o_y</span><span class="p">,</span> <span class="n">o_z</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Create 11 fine-grained radius subsets</span>
+        <span class="n">voids_subsets_all</span> <span class="o">=</span> <span class="n">sort_voids_by_radius</span><span class="p">(</span><span class="n">voids_df</span><span class="p">)</span>  <span class="c1"># List of 11 dataframes</span>
+
+        <span class="n">yolo_targets</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Process 3 heads (scales: 2x2x2, 4x4x4, 8x8x8)</span>
+        <span class="k">for</span> <span class="n">head</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">NUM_HEADS</span><span class="p">):</span>
+            <span class="n">grid_size</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">**</span> <span class="p">(</span><span class="n">head</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># 2, 4, 8</span>
+            <span class="n">scale</span> <span class="o">=</span> <span class="n">grid_size</span> <span class="o">/</span> <span class="n">CUBESIZE</span>
+
+            <span class="c1"># Storage for 3 anchors × 5 channels = 15 channels</span>
+            <span class="n">head_targets</span> <span class="o">=</span> <span class="p">[]</span>
+
+            <span class="c1"># Process 3 anchors for this head</span>
+            <span class="k">for</span> <span class="n">anchor</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">NUM_ANCHORS</span><span class="p">):</span>
+                <span class="c1"># Calculate which 3 consecutive subsets this anchor uses</span>
+                <span class="c1"># Sliding window: each anchor shifts by 1 subset</span>
+                <span class="n">base_idx</span> <span class="o">=</span> <span class="n">head</span> <span class="o">*</span> <span class="n">NUM_ANCHORS</span> <span class="o">+</span> <span class="n">anchor</span>
+                <span class="n">subset_indices</span> <span class="o">=</span> <span class="p">[</span><span class="n">base_idx</span><span class="p">,</span> <span class="n">base_idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">base_idx</span> <span class="o">+</span> <span class="mi">2</span><span class="p">]</span>
+                <span class="c1"># print(subset_indices)</span>
+                <span class="c1"># print(len(voids_subsets_all))</span>
+
+                <span class="c1"># Merge the 3 consecutive subsets for this anchor</span>
+                <span class="n">anchor_voids</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span>
+                    <span class="p">[</span><span class="n">voids_subsets_all</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">subset_indices</span><span class="p">],</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span>
+                <span class="p">)</span>
+
+                <span class="c1"># Apply WBF (Weighted Box Fusion) if there are multiple voids</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">anchor_voids</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="n">coords</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span>
+                        <span class="n">anchor_voids</span><span class="p">[[</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span>
+                    <span class="p">)</span>
+                    <span class="n">distances</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cdist</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">coords</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+                    <span class="n">labels</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">box_fuser</span><span class="o">.</span><span class="n">cluster</span><span class="p">(</span><span class="n">distances</span> <span class="o">*</span> <span class="n">scale</span><span class="p">)</span>
+                    <span class="n">fused_voids</span> <span class="o">=</span> <span class="n">group_means</span><span class="p">(</span><span class="n">anchor_voids</span><span class="p">,</span> <span class="n">labels</span><span class="p">)</span>
+
+                    <span class="c1"># print(f&quot;WBF head {head} anchor {anchor} (grid={grid_size}, subsets={subset_indices}): &quot;</span>
+                    <span class="c1"># f&quot;{len(anchor_voids)} -&gt; {len(fused_voids)} voids&quot;)</span>
+
+                    <span class="n">anchor_voids</span> <span class="o">=</span> <span class="n">fused_voids</span>
+
+                <span class="c1"># Generate 5-channel target for this anchor</span>
+                <span class="n">anchor_target</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span>
+                    <span class="n">voids_to_target_full_grid</span><span class="p">(</span>
+                        <span class="n">anchor_voids</span><span class="p">,</span> <span class="n">anchor</span><span class="p">,</span> <span class="n">grid_size</span><span class="p">,</span> <span class="n">o_x</span><span class="p">,</span> <span class="n">o_y</span><span class="p">,</span> <span class="n">o_z</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+
+                <span class="n">head_targets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">anchor_target</span><span class="p">)</span>
+
+            <span class="c1"># Concatenate 3 anchors: (5, H, W, D) × 3 → (15, H, W, D)</span>
+            <span class="n">head_target_15ch</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">head_targets</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">yolo_targets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">head_target_15ch</span><span class="p">)</span>
+
+        <span class="c1"># Prepare input density</span>
+        <span class="n">density</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogramdd</span><span class="p">(</span>
+            <span class="n">particles_df</span><span class="p">[[</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">resolution</span>
+        <span class="p">)</span>
+
+        <span class="n">input_tensor</span> <span class="o">=</span> <span class="n">prepare_void_detection_input</span><span class="p">(</span><span class="n">density</span><span class="p">)</span>
+
+        <span class="n">item</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;input&quot;</span><span class="p">:</span> <span class="n">input_tensor</span><span class="p">,</span>
+            <span class="s2">&quot;targets&quot;</span><span class="p">:</span> <span class="n">yolo_targets</span><span class="p">,</span>  <span class="c1"># List of tensors: one for each head</span>
+            <span class="s2">&quot;ox&quot;</span><span class="p">:</span> <span class="n">o_x</span><span class="p">,</span>
+            <span class="s2">&quot;oy&quot;</span><span class="p">:</span> <span class="n">o_y</span><span class="p">,</span>
+            <span class="s2">&quot;oz&quot;</span><span class="p">:</span> <span class="n">o_z</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="c1"># self.cached_items[index] = item</span>
+        <span class="k">return</span> <span class="n">item</span>
+
+    <span class="k">def</span> <span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns the total number of samples in the dataset.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - int: dataset length</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">file_indices</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="void_data_loader"><a class="viewcode-back" href="../../src.html#src.dataset.void_data_loader">[docs]</a><span class="k">def</span> <span class="nf">void_data_loader</span><span class="p">(</span><span class="n">batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">max_train</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_val</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Creates PyTorch DataLoader objects for training and validation datasets.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">    - batch_size: int, size of each batch for data loading (default: 16)</span>
+<span class="sd">    - max_train: int or None, if set limits the training set to this many samples</span>
+<span class="sd">    - max_val: int or None, if set limits the validation set to this many samples</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    - train_loader, val_loader: two PyTorch DataLoader objects for train and validation</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">train_part_path</span><span class="p">,</span> <span class="n">val_part_path</span><span class="p">,</span> <span class="n">train_void_path</span><span class="p">,</span> <span class="n">val_void_path</span> <span class="o">=</span> <span class="n">get_dataset_paths</span><span class="p">()</span>
+    <span class="n">train</span> <span class="o">=</span> <span class="n">VoidDataset</span><span class="p">(</span>
+        <span class="n">particles_dir</span><span class="o">=</span><span class="n">train_part_path</span><span class="p">,</span> <span class="n">voids_dir</span><span class="o">=</span><span class="n">train_void_path</span><span class="p">,</span> <span class="n">augment</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+    <span class="n">validation</span> <span class="o">=</span> <span class="n">VoidDataset</span><span class="p">(</span>
+        <span class="n">particles_dir</span><span class="o">=</span><span class="n">val_part_path</span><span class="p">,</span> <span class="n">voids_dir</span><span class="o">=</span><span class="n">val_void_path</span><span class="p">,</span> <span class="n">augment</span><span class="o">=</span><span class="kc">False</span>
+    <span class="p">)</span>
+
+    <span class="n">train_loader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span>
+        <span class="n">train</span><span class="p">,</span>
+        <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">,</span>
+        <span class="n">num_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">pin_memory</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">persistent_workers</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">valid_loader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span>
+        <span class="n">validation</span><span class="p">,</span>
+        <span class="n">batch_size</span><span class="o">=</span><span class="n">batch_size</span><span class="p">,</span>
+        <span class="n">num_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">pin_memory</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">persistent_workers</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">train_loader</span><span class="p">,</span> <span class="n">valid_loader</span></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">DeepCosmoNet Voids</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2026, Vincenzo Del Zoppo.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 5.3.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
